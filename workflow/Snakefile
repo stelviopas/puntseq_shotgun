@@ -1,0 +1,14 @@
+# ======================================================
+# Config files
+# ======================================================
+configfile: "config/config.yaml"
+
+#======================================================
+# Rules
+#======================================================
+#rule all:
+#    input: "results/fastqc/{sample}.html".format(sample=sample)
+
+# the snakemake files that run the different parts of the pipeline
+include: "rules/fastqc.smk"
+include: "rules/porechop.smk"
