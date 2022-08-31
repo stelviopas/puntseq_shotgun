@@ -1,3 +1,9 @@
+# snakemake structure 
+resources/
+logs/
+results/ 
+reports/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
