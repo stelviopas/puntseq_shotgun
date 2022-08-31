@@ -3,6 +3,7 @@ resources/
 logs/
 results/ 
 reports/
+.snakemake
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
