@@ -1,0 +1,7 @@
+samples:
+        shotgun:   "resources/shotgun.fastq.gz" 
+fastqc:
+        threads: 4
+porechop:
+        threads: 4
+        memory: 3200
