@@ -1,0 +1,10 @@
+# cluster_config.yml - cluster configuration
+__default__:
+     account: grekova
+     partition: cluster
+     time: 01:00:00 # time limit for each job
+     nodes: 1
+     ntasks-per-node: 16 #Request n cores be allocated per node.
+     chdir: /home/anastasia/workspace/puntseqWGS
+     output: test-%j.out
+     error: test-%j.err
