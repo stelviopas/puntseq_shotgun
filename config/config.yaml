@@ -4,4 +4,4 @@ fastqc:
         threads: 4
 porechop:
         threads: 4
-        memory: 3200
+        memory: 32000
