@@ -2,9 +2,6 @@
 __default__:
      account: grekova
      partition: cluster
-     time: 01:00:00 # time limit for each job
-     nodes: 1
-     ntasks-per-node: 16 #Request n cores be allocated per node.
-     chdir: /home/anastasia/workspace/puntseqWGS
-     output: test-%j.out
-     error: test-%j.err
+     time: 16:00:00 # time limit for each job in h:m:s
+     nodes: 3
+     ntasks-per-node: 6 #Request n cores be allocated per node.

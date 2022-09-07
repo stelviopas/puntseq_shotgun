@@ -3,5 +3,5 @@ samples:
 fastqc:
         threads: 4
 porechop:
-        threads: 4
+        threads: 8
         memory: 32000
