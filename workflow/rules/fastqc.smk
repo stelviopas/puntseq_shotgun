@@ -14,7 +14,9 @@ rule initial_fastqc:
     threads: config["fastqc"]["threads"] 
     wrapper:
         "v1.10.0/bio/fastqc"
-
+# [TODO] refactor fastQC to take different arguments according to input files like done in nanoplot
+# or remove, since fastQC is not very useful for Nanopore data 
+"""
 rule after_porechop_fastqc:
     input:
         "results/current/porechop/{sample}.porechopped.fastq.gz"
@@ -28,4 +30,4 @@ rule after_porechop_fastqc:
     threads: config["fastqc"]["threads"]
     wrapper:
         "v1.10.0/bio/fastqc"
-
+"""

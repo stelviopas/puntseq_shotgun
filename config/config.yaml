@@ -1,7 +1,16 @@
 samples:
-        shotgun:   "resources/shotgun.fastq.gz" 
+        shotgun:   "resources/shotgun.fastq.gz"
+qc_input:
+        shotgun:   "resources/shotgun.fastq.gz"
+        shotgun.porechopped: "results/current/porechop/shotgun.porechopped.fastq.gz"
+        shotgun.filtered: "results/current/nanofilt/shotgun.filtered.fastq.gz" 
 fastqc:
         threads: 4
 porechop:
         threads: 8
+        memory: 32000
+nanoplot:
+        threads: 4
+        memory: 32000
+nanofilt:
         memory: 32000

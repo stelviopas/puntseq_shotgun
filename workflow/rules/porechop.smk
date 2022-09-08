@@ -15,6 +15,4 @@ rule porechop:
 	conda:
 		"../envs/porechop.yaml"
 	shell:
-		"""
-		porechop -i {input} -o {output} -t {threads} -v 2
-		"""
+		"porechop -i {input} -o {output} -t {threads} -v 2"
