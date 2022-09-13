@@ -2,6 +2,6 @@
 __default__:
      account: grekova
      partition: cluster
-     time: 4:00:00 # time limit for each job in h:m:s
-     nodes: 2
-     ntasks-per-node: 4 #Request n cores be allocated per node.
+     time: 60:00:00 # time limit for each job in h:m:s
+     nodes: 4
+     mem: 100Gb

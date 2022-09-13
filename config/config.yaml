@@ -14,3 +14,6 @@ nanoplot:
         memory: 32000
 nanofilt:
         memory: 32000
+flye:
+        memory: 100000
+        threads: 16
