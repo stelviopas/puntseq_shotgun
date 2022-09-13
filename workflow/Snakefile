@@ -7,13 +7,14 @@ configfile: "config/config.yaml"
 # Rules
 #======================================================
 
-PROCESSING_STEPS = ["shotgun", "shotgun.porechopped", "shotgun.filtered"] 
+#PROCESSING_STEPS = ["shotgun", "shotgun.porechopped", "shotgun.filtered"] 
 
-rule all:
-     input: expand("results/current/nanoplot/{processing_step}_NanoPlot-report.html", processing_step=PROCESSING_STEPS)
+#rule all:
+#     input: expand("results/current/nanoplot/{processing_step}_NanoPlot-report.html", processing_step=PROCESSING_STEPS)
 
 # the snakemake files that run the different parts of the pipeline
 #include: "rules/fastqc.smk"
 include: "rules/porechop.smk"
 include: "rules/nanoplot.smk"
 include: "rules/nanofilt.smk"
+include: "rules/flye.smk"
