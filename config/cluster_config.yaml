@@ -2,6 +2,6 @@
 __default__:
      account: grekova
      partition: cluster
-     time: 60:00:00 # time limit for each job in h:m:s
+     time: 150:00:00 # time limit for each job in h:m:s
      nodes: 4
      mem: 100Gb

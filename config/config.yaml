@@ -17,3 +17,13 @@ nanofilt:
 flye:
         memory: 100000
         threads: 16
+racon:
+        memory: 100000
+        threads: 16
+minimap2:
+        memory: 100000
+        threads: 16
+medaka:
+        threads: 8
+        model: 'r941_min_high_g360'
+        
