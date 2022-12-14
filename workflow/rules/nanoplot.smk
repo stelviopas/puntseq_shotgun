@@ -15,5 +15,5 @@ rule nanoplot:
         conda:
                 "../envs/nanoplot.yaml"
         shell:
-                "NanoPlot --fastq {input} --outdir results/current/nanoplot/ --prefix {wildcards.suffix}_ "
+                "NanoPlot --fastq {input} --outdir results/current/nanoplot/ --prefix {wildcards.suffix}_  "
 		"-t {threads} --tsv_stats --store --N50 --format png" 

@@ -1,22 +1,53 @@
 samples:
-        shotgun:   "resources/shotgun.fastq.gz"
+# [TODO] think if you need a new list cont/ copy of desired samples for qc procedure? 
+        shotgun_new:   "results/current/guppy/demult/shotgun.fastq.gz"
+        BC02_new: "results/current/guppy/demult/BC02.fastq.gz"
+        BC03_new: "results/current/guppy/demult/BC03.fastq.gz"
+        BC04_new: "results/current/guppy/demult/BC04.fastq.gz"
+        shotgun_fahad: "resources/basecalled_from_fahad/current/shotgun.fastq.gz"
+        BC02_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC02.porechop.fastq.gz"
+        BC03_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC03.porechop.fastq.gz"
+        BC04_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC04.porechop.fastq.gz"
+        
 qc_input:
-        shotgun:   "resources/shotgun.fastq.gz"
-        shotgun.porechopped: "results/current/porechop/shotgun.porechopped.fastq.gz"
-        shotgun.filtered: "results/current/nanofilt/shotgun.filtered.fastq.gz" 
+        shotgun_new:   "results/current/nanofilt/shotgun_new.filtered.fastq.gz"
+        BC02_new: "results/current/nanofilt/BC02_new.filtered.fastq.gz"
+        BC03_new: "results/current/nanofilt/BC03_new.filtered.fastq.gz"
+        BC04_new: "results/current/nanofilt/BC04_new.filtered.fastq.gz"
+        shotgun_fahad: "results/current/nanofilt/shotgun_fahad.filtered.fastq.gz"
+        BC02_porechop_fahad: "results/current/nanofilt/BC02_porechop_fahad.filtered.fastq.gz"
+        BC03_porechop_fahad: "results/current/nanofilt/BC03_porechop_fahad.filtered.fastq.gz"
+        BC04_porechop_fahad: "results/current/nanofilt/BC04_porechop_fahad.filtered.fastq.gz"
+
+guppy:
+        input_path: "resources/raw/current/PuntSeq_fast5/"
+        pass_path: "results/current/guppy/basecalled/pass/"
+        save_path: "results/current/guppy/"
+        flowcell: "FLO-MIN106"
+        kit: "SQK-LSK109"
+        barcode_kits: "SQK-16S024"
+        num_callers: 16
+        gpu_runners_per_device: 4
+        chunks_per_runner: 256
+        chunk_size: 1000
+        memory: 50000 
 fastqc:
         threads: 4
 porechop:
-        threads: 8
-        memory: 32000
+        threads: 36
+        memory: 100000
 nanoplot:
-        threads: 4
-        memory: 32000
+        threads: 36
+        memory: 100000
 nanofilt:
-        memory: 32000
+        memory: 100000
+        threads: 36
+        l: 200
+        q: 9
 flye:
         memory: 100000
-        threads: 16
+        threads: 36
+        model_flag: "--nano-raw"
 racon:
         memory: 100000
         threads: 16
@@ -24,6 +55,16 @@ minimap2:
         memory: 100000
         threads: 16
 medaka:
-        threads: 8
-        model: 'r941_min_high_g360'
-        
+        align_threads: 64
+        consensus_threads: 64
+        stitch_threads: 64
+        model: 'r941_min_hac_g507'
+bioawk:
+        threads: 1
+        min_contig_length: 1000       
+metabat2:
+        threads: 36
+maxbin2:
+        threads: 36 
+vamb_workflow:
+        index_size: "64G"

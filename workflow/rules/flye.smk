@@ -9,6 +9,8 @@ rule flye:
                 "logs/flye/{sample}.log"
         conda:
                 "../envs/flye.yaml"
+        params:
+                model_flag=config["flye"]["model_flag"]
         shell:
-                "flye --meta --nano-raw {input} -o results/current/flye/{wildcards.sample} -i 1 --threads {threads}"
+                "flye --meta {params.model_flag} {input} -o results/current/flye/{wildcards.sample} -i 1 --threads {threads}"
 

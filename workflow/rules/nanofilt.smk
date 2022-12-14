@@ -10,6 +10,12 @@ rule nanofilt:
                 "logs/nanofilt/{sample}.log"
         conda:
                 "../envs/nanofilt.yaml"
+        params:
+                q=config["nanofilt"]["q"],
+                l=config["nanofilt"]["l"]
+        threads:
+                config["nanofilt"]["threads"]
+
         shell:
-                "gunzip -c {input} | NanoFilt -q 7 -l 200 | gzip > {output}"
+                "gunzip -c {input} | NanoFilt -q {params.q} -l {params.l} | gzip > {output}"
 

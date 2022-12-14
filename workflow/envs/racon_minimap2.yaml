@@ -1,4 +1,4 @@
-name: racon)minimap2
+name: racon_minimap2
 channels:
           - conda-forge
           - bioconda
