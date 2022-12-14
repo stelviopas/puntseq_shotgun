@@ -1,0 +1,4 @@
+#### GPU ####
+snakemake --forcerun guppy --cluster-config ./config/cluster_config.yaml --use-conda -s workflow/Snakefile --cluster "sbatch  -J guppy_basecalling -t {cluster.time} -p {cluster.partition} -q {cluster.qos} --mem={cluster.mem} --gres=gpu:1" --jobs 4
+
+
