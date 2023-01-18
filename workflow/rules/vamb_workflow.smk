@@ -102,5 +102,6 @@ rule vamb:
     shell:
         """
            vamb --outdir {params.dir}/out --fasta {input.catalog} --bamfiles {input.bam} 2>{log}
-           cp {params.dir}/out/* {params.dir}
+           mv {params.dir}/out/* {params.dir}/bins
+           rm -r {params.dir}/out/*
 	"""

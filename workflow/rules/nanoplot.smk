@@ -16,4 +16,4 @@ rule nanoplot:
                 "../envs/nanoplot.yaml"
         shell:
                 "NanoPlot --fastq {input} --outdir results/current/nanoplot/ --prefix {wildcards.suffix}_  "
-		"-t {threads} --tsv_stats --store --N50 --format png" 
+		"-t {threads} --tsv_stats --store --N50 --title {wildcards.suffix} --format png" 

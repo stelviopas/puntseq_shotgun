@@ -1,5 +1,4 @@
 samples:
-# [TODO] think if you need a new list cont/ copy of desired samples for qc procedure? 
         shotgun_new:   "results/current/guppy/demult/shotgun.fastq.gz"
         BC02_new: "results/current/guppy/demult/BC02.fastq.gz"
         BC03_new: "results/current/guppy/demult/BC03.fastq.gz"
@@ -8,16 +7,26 @@ samples:
         BC02_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC02.porechop.fastq.gz"
         BC03_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC03.porechop.fastq.gz"
         BC04_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC04.porechop.fastq.gz"
-        
+# samples for QC report via Nanoplot        
 qc_input:
-        shotgun_new:   "results/current/nanofilt/shotgun_new.filtered.fastq.gz"
-        BC02_new: "results/current/nanofilt/BC02_new.filtered.fastq.gz"
-        BC03_new: "results/current/nanofilt/BC03_new.filtered.fastq.gz"
-        BC04_new: "results/current/nanofilt/BC04_new.filtered.fastq.gz"
-        shotgun_fahad: "results/current/nanofilt/shotgun_fahad.filtered.fastq.gz"
-        BC02_porechop_fahad: "results/current/nanofilt/BC02_porechop_fahad.filtered.fastq.gz"
-        BC03_porechop_fahad: "results/current/nanofilt/BC03_porechop_fahad.filtered.fastq.gz"
-        BC04_porechop_fahad: "results/current/nanofilt/BC04_porechop_fahad.filtered.fastq.gz"
+        # filtered
+        shotgun_new_filtered:   "results/current/nanofilt/shotgun_new.filtered.fastq.gz"
+        BC02_new_filtered: "results/current/nanofilt/BC02_new.filtered.fastq.gz"
+        BC03_new_filtered: "results/current/nanofilt/BC03_new.filtered.fastq.gz"
+        BC04_new_filtered: "results/current/nanofilt/BC04_new.filtered.fastq.gz"
+        shotgun_fahad_filtered: "results/current/nanofilt/shotgun_fahad.filtered.fastq.gz"
+        BC02_porechop_fahad_filtered: "results/current/nanofilt/BC02_porechop_fahad.filtered.fastq.gz"
+        BC03_porechop_fahad_filtered: "results/current/nanofilt/BC03_porechop_fahad.filtered.fastq.gz"
+        BC04_porechop_fahad_filtered: "results/current/nanofilt/BC04_porechop_fahad.filtered.fastq.gz"
+        # not filtered, but Guppy outputs Q > 9 automaticaly 
+        shotgun_new:   "results/current/guppy/demult/shotgun.fastq.gz"
+        BC02_new: "results/current/guppy/demult/BC02.fastq.gz"
+        BC03_new: "results/current/guppy/demult/BC03.fastq.gz"
+        BC04_new: "results/current/guppy/demult/BC04.fastq.gz"
+        shotgun_fahad: "resources/basecalled_from_fahad/current/shotgun.fastq.gz"
+        BC02_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC02.porechop.fastq.gz"
+        BC03_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC03.porechop.fastq.gz"
+        BC04_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC04.porechop.fastq.gz"
 
 guppy:
         input_path: "resources/raw/current/PuntSeq_fast5/"
@@ -31,8 +40,6 @@ guppy:
         chunks_per_runner: 256
         chunk_size: 1000
         memory: 50000 
-fastqc:
-        threads: 4
 porechop:
         threads: 36
         memory: 100000

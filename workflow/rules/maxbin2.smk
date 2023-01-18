@@ -9,5 +9,5 @@ rule maxbin2:
 	log: "logs/maxbin2/{sample}.txt"
 	shell:
 		"""
-		run_MaxBin.pl -contig {input.fa} -reads {input.fq} -out results/current/maxbin2/{wildcards.sample}/{wildcards.sample} -thread {threads}
+		run_MaxBin.pl -contig {input.fa} -reads {input.fq} -out results/current/maxbin2/{wildcards.sample}/{wildcards.sample} -thread {threads} -plotmarker
 		"""

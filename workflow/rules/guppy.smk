@@ -4,8 +4,7 @@ rule guppy:
 		expand(config["guppy"]["input_path"] + "{id}.fast5", id=IDS)
 	output:
 		"results/current/guppy/basecalled/pass/",
-		"results/current/guppy/basecalled/failed/",
-		"results/current/guppy/basecalled/unclassified/"
+		"results/current/guppy/basecalled/fail/",
 	threads: 
 		config["guppy"]["num_callers"]
 	resources:
@@ -22,4 +21,4 @@ rule guppy:
 		chunks_per_runner=config["guppy"]["chunks_per_runner"],
 		chunk_size=config["guppy"]["chunk_size"]	
 	shell:
-		"""guppy_basecaller --input_path {params.input_path} --save_path {params.save_path} --flowcell {params.flowcell} --kit {params.kit} --num_callers {params.num_callers} --gpu_runners_per_device {params.gpu_runners_per_device} --chunks_per_runner {params.chunks_per_runner} --chunk_size {params.chunk_size} --compress_fastq -x "cuda:0" --disable_pings """
+		"""guppy_basecaller --input_path {params.input_path} --save_path {params.save_path} --flowcell {params.flowcell} --kit {params.kit} --num_callers {params.num_callers} --gpu_runners_per_device {params.gpu_runners_per_device} --chunks_per_runner {params.chunks_per_runner} --chunk_size {params.chunk_size} --compress_fastq -x "cuda:0" --disable_pings 2>{log} """
