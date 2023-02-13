@@ -17,6 +17,11 @@ rule all:
 ############	
 # FULL PIPELINE #	
 		expand("results/current/gtdbtk/{s}", s=ASSEMBLY_SAMPLES),
+		expand("results/current/vamb/{s}/bins/clusters.tsv", s=ASSEMBLY_SAMPLES),
+		expand("results/current/maxbin2/{s}/{s}.summary", s=ASSEMBLY_SAMPLES),
+                expand("results/current/metabat2/{s}/{s}", s=ASSEMBLY_SAMPLES),
+		expand("results/current/das_tool/{s}/{s}_DASTool_summary.txt", s=ASSEMBLY_SAMPLES),
+		expand("results/current/coverm/{s}_summary.txt", s=ASSEMBLY_SAMPLES),	
 		"results/current/amplicon/amplicon_new.fasta", "results/current/amplicon/amplicon_fahad.fasta"	
 ################
 
