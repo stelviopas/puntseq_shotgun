@@ -2,7 +2,6 @@
 slurm*
 
 #pictures 
-*.png
 *.svg
 *.pdf
 
