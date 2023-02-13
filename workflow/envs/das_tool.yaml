@@ -1,7 +1,7 @@
 name: das_tool
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
@@ -13,7 +13,7 @@ dependencies:
   - boost-cpp=1.66.0=1
   - bwidget=1.9.14=ha770c72_1
   - bzip2=1.0.8=h7f98852_4
-  - ca-certificates=2022.10.11=h06a4308_0
+  - ca-certificates=2022.12.7=ha878542_0
   - cairo=1.14.12=h80bd089_1005
   - curl=7.68.0=hf8cf82a_0
   - das_tool=1.1.1=r351_2
@@ -65,7 +65,7 @@ dependencies:
   - nettle=3.3=0
   - numpy=1.15.0=py36_blas_openblashd3ea46f_200
   - openblas=0.2.20=8
-  - openssl=1.1.1s=h166bdaf_0
+  - openssl=1.1.1t=h0b41bf4_0
   - pango=1.40.14=hf0c64fd_1003
   - pcre=8.45=h9c3ff4c_0
   - perl=5.26.2=h14c3975_0

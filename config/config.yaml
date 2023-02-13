@@ -7,8 +7,18 @@ samples:
         BC02_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC02.porechop.fastq.gz"
         BC03_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC03.porechop.fastq.gz"
         BC04_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC04.porechop.fastq.gz"
+amplicon:
+        BC02_new: "results/current/porechop/BC02_new.porechopped.fastq.gz"
+        BC03_new: "results/current/porechop/BC03_new.porechopped.fastq.gz"
+        BC04_new: "results/current/porechop/BC04_new.porechopped.fastq.gz"
+        BC02_porechop_fahad: "results/current/porechop/BC02_porechop_fahad.porechopped.fastq.gz"
+        BC03_porechop_fahad: "results/current/porechop/BC03_porechop_fahad.porechopped.fastq.gz"
+        BC04_porechop_fahad: "results/current/porechop/BC04_porechop_fahad.porechopped.fastq.gz"
+
 # samples for QC report via Nanoplot        
 qc_input:
+        # reference-mapped reads
+        leptospira_interrogans_shotgun_new: "results/current/samtools/leptospira_interrogans_shotgun_new.fastq" 
         # filtered
         shotgun_new_filtered:   "results/current/nanofilt/shotgun_new.filtered.fastq.gz"
         BC02_new_filtered: "results/current/nanofilt/BC02_new.filtered.fastq.gz"
@@ -46,15 +56,21 @@ porechop:
 nanoplot:
         threads: 36
         memory: 100000
+fastqc:
+        threads: 36
+        memory: 100000
 nanofilt:
         memory: 100000
         threads: 36
         l: 200
         q: 9
+        min_length: 1400
+        max_length: 1600
 flye:
         memory: 100000
         threads: 36
         model_flag: "--nano-raw"
+        polish_rounds: 3 # Note: only for reference-based, for metagenome assembly i=1
 racon:
         memory: 100000
         threads: 16
@@ -75,3 +91,10 @@ maxbin2:
         threads: 36 
 vamb_workflow:
         index_size: "64G"
+das_tool:
+        threads: 36
+coverm:
+        threads: 36
+gtdbtk:
+        threads: 64
+        db: "/lustre/groups/haicu/workspace/anastasiia.grekova/gtdbtk-2.1.1/db"

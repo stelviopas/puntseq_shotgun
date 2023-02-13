@@ -1,6 +1,8 @@
 ---
 title: "Puntseq WGS visualizations"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r}
@@ -11,18 +13,25 @@ library(dplyr)
 library(RColorBrewer)
 library(scales)
 library(stringr)
+library(reticulate)
+library(Rcpp)
+library(forcats)
+library(patchwork)
 ```
 # Quality control 
+TODO I do not know how to fix the error on the server; however the plot is anyways complete 
 
 ```{r}
 require("reticulate")
+#only activate once 
+#conda_create("pickle", python_version = "3.9")
+use_condaenv("pickle")
+#conda_install("pickle", "pandas")
 
-#conda_install("r-reticulate", "pandas")
-source_python("pickle_reader.py")
+source_python("workflow/scripts/pickle_reader.py")
 fastq_new_dt <- data.table(read_pickle_file("qc_plots/shotgun_new_NanoPlot-data.pickle"))
 fastq_fahad_dt <- data.table(read_pickle_file("qc_plots/shotgun_fahad_NanoPlot-data.pickle"))
 tables <- list(fastq_new = fastq_new_dt, fastq_fahad=fastq_fahad_dt)
-
 runs_dt <- rbindlist(tables, idcol = "run")
 runs_dt$run <- str_replace(runs_dt$run, 'fastq_new', "Guppy v6.3.7+532d626")
 runs_dt$run <- str_replace(runs_dt$run, 'fastq_fahad', "Guppy v4.0.14")
@@ -31,71 +40,126 @@ ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d() + scale_fill_continuous
 ``` 
 
 # MAGpy shotgun
-## CheckM
+## Prior knowledge 
 ```{r}
-checkm_dt <- fread("reports/checkm_plus.txt")
+PATHOGENIC_GENERA <- c("Arcobacter", "Aeromonas", "Pseudomonas", 
+                       "Legionella", "Escherichia", "Bacillus", 
+                       "Serratia", "Klebsiella", "ENterobacter", 
+                       "Yersinia", "Acinetobacter", "Coxiella",
+                       "Salmonella", "Streptococcus", "Enterococcus",
+                       "Clostridium", "Citrobacter", "Stenotrophomonas",
+                       "Listeria", "Leptospira")
+```
+## CheckM
+Tidy a data table. 
+```{r}
+checkm_dt <- fread("MAGpy/checkm_plus.txt")
 # bin_id contains the sample identifier and bin number, which we need in a separate column 
 checkm_dt <- checkm_dt %>% separate(col = "bin_id", into = c("shotgun", "sampletmp", "binning_tool", "bin_id")) %>% unite(col=sample, 
                                                                                                              shotgun, 
                                                                                                              sampletmp, sep = "_") 
-checkm_dt[binning_tool == "vamb" & sample == 'shotgun_fahad',]
+checkm_dt$sample <- str_replace(checkm_dt$sample, 'shotgun_new', "Guppy v6.3.7")
+checkm_dt$sample <- str_replace(checkm_dt$sample, 'shotgun_fahad', "Guppy v4.0.14")
 ```
-Visualize general distribution of completeness and contamination across all bins
+General distribution of completeness and contamination across all bins
 ```{r}
-ggplot(data = checkm_dt, aes(x=sample, y=completeness)) + geom_violin() + geom_point() + facet_wrap(~binning_tool) + ggtitle("CheckM estimated completeness of assemblies")
-ggplot(data = checkm_dt, aes(x=sample, y=contamination)) + geom_violin() + geom_point() + facet_wrap(~binning_tool) + ggtitle("CheckM estimated contamination of assemblies")
-ggplot(data = checkm_dt[contamination <= 100,], aes(x=sample, y=contamination)) + geom_violin() + geom_point() + facet_wrap(~binning_tool) + ggtitle("CheckM estimated contamination of assemblies with removed outliers (contamination <= 100)")
-ggplot(data = checkm_dt, aes(x=sample, fill=binning_tool)) + geom_bar(position=position_dodge()) + ylab("Number of bins") + ggtitle("Total number of bins")
+completeness <- ggplot(data = checkm_dt, aes(x=sample, y=completeness)) + 
+  geom_violin() + 
+  geom_point() + 
+  facet_wrap(~binning_tool) + 
+  guides(x =  guide_axis(angle = 45)) +
+  theme(axis.title.x = element_blank()) 
+
+contamination_reduced <- ggplot(data = checkm_dt[contamination <= 100,], aes(x=sample, y=contamination)) + 
+  geom_violin() + 
+  geom_point() + 
+  facet_wrap(~binning_tool) + 
+  guides(x = guide_axis(angle = 45)) + 
+  theme(axis.title.x = element_blank()) 
+
+completeness / contamination_reduced 
 ```
+Number of bins
 ```{r}
-library(forcats)
-bins_summary_plot <- ggplot(data = checkm_dt, aes(x = fct_infreq(marker_lineage), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
-bins_summary_plot + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + xlab("") + ggtitle("Predicted taxonomy")
-```
-### Shotgun_fahad taxonomy 
-```{r}
-checkm_dt[sample == 'shotgun_fahad',.(num_bins = .N), by=.(marker_lineage, binning_tool)] %>% .[order(num_bins),] 
-```
-### Shotgun_new taxonomy 
-```{r}
-checkm_dt[sample == 'shotgun_new',.(num_bins = .N), by=.(marker_lineage, binning_tool)] %>% .[order(num_bins),] 
-```
+cast_completeness <- function(completeness){
+  if (completeness > 90) {
+    return("compl90")
+  }
+  else if (completeness > 80) {
+    return("compl80")
+  }
+  else if (completeness > 70) {
+    return("compl70")
+  }
+  else if (completeness > 60) {
+    return("compl60")
+  }
+  else {
+    return("incomplete")
+  }
+}
+bin_completeness <- checkm_dt %>% .[, stack := sapply(completeness, cast_completeness)] %>% .[, .(num_bins = .N), by=.(stack, binning_tool, sample)] %>% .[order(stack),]
+
+ggplot(data = bin_completeness, aes(x=binning_tool, y=num_bins, fill=stack)) + 
+  geom_bar(stat = "identity", 
+           position="stack") + 
+  ylab("number of bins") + 
+  scale_fill_brewer(palette="Paired") +
+  theme_minimal() + 
+  guides(fill=guide_legend(title = "binning tool")) + #change legend title 
+  theme(axis.title.x = element_blank()) +
+  facet_grid(~ sample)
+``` 
+
 ## Sourmash 
+Tidy a data table
 ```{r}
-sourmash_dt <- fread("reports/sourmash_report.csv")
+sourmash_dt <- fread("MAGpy/sourmash_report.csv")
 sourmash_dt <- sourmash_dt %>% separate(ID, into = c(NA, "shotgun", "sample", "binning_tool", "bin_id", NA)) %>% unite(col=sample, shotgun, sample, sep = "_")
-sourmash_dt[binning_tool == "vamb",]
-```
-```{r}
-bins_summary_plot <- ggplot(data = sourmash_dt[family != ""], aes(x = fct_infreq(family), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
-bins_summary_plot + xlab("") + coord_flip() + ggtitle("Predicted family by sourmash")
-```
-## DIAMOND
-```{r}
-diamond_dt <- fread("reports/diamond_bin_report_plus.tsv")
-# genus column occurs twice 
-colnames(diamond_dt)[5] = "estimated_genus"
-diamond_dt <- diamond_dt %>% separate(., name, into = c("shotgun", "sample", "binning_tool", "bin_id")) %>% unite(col=sample, shotgun, sample, sep = "_")
-bins_summary_plot <- ggplot(data = diamond_dt[family != ""], aes(x = fct_infreq(family), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
-bins_summary_plot  + xlab("") + coord_flip() + ggtitle("Predicted family by diamond")
-unique(diamond_dt[genus != "", estimated_genus])
 
-diamond_dt[estimated_genus %in% c("Vibrio", "Rickettsia", "Legionella","Mycobacterium" ),] %>% merge.data.table(., checkm_dt, by=c("sample", "binning_tool", "bin_id"))
+sourmash_dt$sample <- str_replace(sourmash_dt$sample, 'shotgun_new', "Guppy v6.3.7")
+sourmash_dt$sample <- str_replace(sourmash_dt$sample, 'shotgun_fahad', "Guppy v4.0.14")
 ```
+Bins summary plot 
 ```{r}
-bins_summary_plot <- ggplot(data = sourmash_dt[family != ""], aes(x = fct_infreq(family), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
-bins_summary_plot  + xlab("") + coord_flip() + ggtitle("Predicted family by sourmash")
-
 bins_summary_plot <- ggplot(data = sourmash_dt[genus != ""], aes(x = fct_infreq(genus), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
 bins_summary_plot + xlab("") + coord_flip() + ggtitle("Predicted genus by sourmash")
 ```
-## Shotgun fahad assembly statistics 
+## DIAMOND
+Tidy the data table 
+```{r}
+diamond_dt <- fread("MAGpy/diamond_bin_report_plus.tsv")
+
+# genus column occurs twice 
+colnames(diamond_dt)[5] = "estimated_genus"
+diamond_dt <- diamond_dt %>% separate(., name, into = c("shotgun", "sample", "binning_tool", "bin_id")) %>% unite(col=sample, shotgun, sample, sep = "_")
+diamond_dt$sample <- str_replace(diamond_dt$sample , 'shotgun_new', "Guppy v6.3.7")
+diamond_dt$sample <- str_replace(diamond_dt$sample , 'shotgun_fahad', "Guppy v4.0.14")
+diamond_dt[,.N, by=.(family, sample)]
+```
+Bins summary plot 
+```{r}
+ggplot(data = diamond_dt[genus != ""], aes(x = fct_infreq(genus), fill = binning_tool)) +
+  geom_bar(stat="count") + 
+  ylab("Number of bins") + 
+  facet_grid(~sample) + 
+  xlab("") + 
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  coord_flip() + 
+  ggtitle("Predicted genus (shotgun)")
+
+```
+## Shotgun assembly statistics 
 [TODO] Size distrbution [bp] of the bins per assembly tool, number of reads [#] per bin (e.g. boxplots)
 [TODO] Relative amount of lost reads
+[TODO] Replot old and new side-by-side 
 
+Old data 
 ```{r}
-contigs_dt <- fread('reports/contig_lengths.csv')
-bins <- fread('reports/clusters.tsv')
+contigs_dt <- fread('results/current/vamb/shotgun_fahad/bins/contig_lengths.csv')
+bins <- fread('results/current/vamb/shotgun_fahad/bins/clusters.tsv')
 colnames(bins) <- c("bin", "contignames")
 colnames(contigs_dt) <- c("index", "contignames", "lengths")
 
@@ -107,13 +171,78 @@ contig_bin_dt$sample <- 'shotgun_fahad'
 contig_bin_dt[,.N, by=bin] %>% .[N != 1]
 bin_lengths <- contig_bin_dt[,.(bin_lengths = sum(lengths), sample), by=.(bin)]
 ggplot(data = bin_lengths, aes(bin_lengths)) + geom_histogram() + scale_x_log10(labels=comma) + scale_y_log10()
-ggplot(data = bin_lengths, aes(sample = bin_lengths)) + geom_qq(distribution =  stats::qunif)  + scale_y_log10() + geom_abline(slope=1, intercept=0) + facet_wrap(~sample)
+#ggplot(data = bin_lengths, aes(sample = bin_lengths)) + geom_qq(distribution =  stats::qunif)  + scale_y_log10() + geom_abline(slope=1, intercept=0) + facet_wrap(~sample)
 ggplot(data = bin_lengths, aes(x=sample, y=bin_lengths)) + geom_violin() + scale_y_log10(labels=comma)
 ```
+New data 
+```{r}
+contigs_dt <- fread('results/current/vamb/shotgun_new/bins/contig_lengths.csv')
+bins <- fread('results/current/vamb/shotgun_new/bins/clusters.tsv')
+colnames(bins) <- c("bin", "contignames")
+colnames(contigs_dt) <- c("index", "contignames", "lengths")
+
+ggplot(data=contigs_dt[lengths>50000], aes(lengths)) + 
+  geom_histogram() + 
+  scale_x_log10(labels=comma) + 
+  scale_y_log10() +
+  xlab("bp") +
+  ylab("bins")
+
+contig_bin_dt <- merge.data.table(contigs_dt, bins, by = "contignames" )
+contig_bin_dt
+contig_bin_dt$sample <- 'shotgun_new'
+contig_bin_dt[,.N, by=bin] %>% .[N != 1]
+bin_lengths <- contig_bin_dt[,.(bin_lengths = sum(lengths), sample), by=.(bin)]
+
+ggplot(data = bin_lengths, aes(bin_lengths)) + 
+  geom_histogram() + 
+  scale_x_log10(labels=comma) + 
+  scale_y_log10() + 
+  xlab("bp")
+
+#ggplot(data = bin_lengths, aes(sample = bin_lengths)) + geom_qq(distribution =  stats::qunif)  + scale_y_log10() + geom_abline(slope=1, intercept=0) + facet_wrap(~sample)
+
+ggplot(data = bin_lengths, aes(x=sample, y=bin_lengths)) + 
+  geom_violin() + 
+  scale_y_log10(labels=comma) + 
+  xlab("bp")
+```
+# IDTaxa 
+
+Define the training set
+```{r}
+library(DECIPHER)
+#http://www2.decipher.codes/Classification/TrainingSets/SILVA_SSU_r138_2019.RData
+load("resources/databases/SILVA_SSU_r138_2019.RData")
+```
+Load the test data.
+
+Which data is inside?  
+1. Filtered reads between 1400 and 1600 bp 
+2. Combine all barcodes from new and old basecalling together into 
+amplicon_fahad.fasta
+amplicon_new.fasta
+
+```{r}
+amplicon_new_BC02 <- readDNAStringSet("results/current/amplicon/BC02_new.filtered.fasta")
+amplicon_new_BC02_result <- IdTaxa(amplicon_new, 
+                              trainingSet, 
+                              strand = 'both', 
+                              type="extended", 
+                              threshold = 0, 
+                              processors = NULL,
+                              verbose = TRUE)
+```
+
+
+
 # 16S EMU
+Tidy a data table.
 ```{r}
 # concatenate all 16S runs into one table 
-files <- list.files('amplicon', full.names = TRUE)[2:7] # first one is a directory with threshold_abundance tsv's
+files <- list.files(path = 'emu/results',
+                    full.names = TRUE,
+                    pattern= "*_rel-abundance.tsv") 
 # name the list elements by the filenames 
 names(files) <- basename(files)
 # read all files at once into a list of data.tables
@@ -122,8 +251,63 @@ tables <- lapply(files, fread)
 # keeping the list names (the filenames) as an id column. 
 amplicon_dt <- rbindlist(tables, idcol = 'filepath')
 amplicon_dt <- amplicon_dt %>% separate(filepath, c("barcode", "sample", NA))
-amplicon_dt[sample == 'porechop', sample := 'fahad']
-head(amplicon_dt)
-ggplot(data = amplicon_dt[abundance > 0.01, ], aes(x=family, y=abundance, fill=sample)) + geom_bar(stat="sum", position="dodge") + xlab("") + coord_flip() + ggtitle("Predicted most abundand families by 16S EMU") + facet_wrap(~barcode)
-ggplot(data = amplicon_dt[genus == 'Leptospira', ], aes(x=species, y=abundance, fill=sample)) + geom_bar(stat="sum", position="dodge") + xlab("") + coord_flip() + ggtitle("Predicted less abundand families by 16S EMU") + facet_wrap(~barcode)
+amplicon_dt$sample <- str_replace(amplicon_dt$sample, 'new', "Guppy v6.3.7")
+amplicon_dt$sample <- str_replace(amplicon_dt$sample, 'porechop', "Guppy v4.0.14")
+```
+Not possible to show all genera because too many, but we can separate the visualization into several parts. 
+## Most abundant genera
+```{r}
+ggplot(data = amplicon_dt[abundance > 0.01, ], aes(x=reorder(genus, desc(abundance)), y=abundance, fill=sample)) + 
+  geom_bar(stat="sum", position="dodge") + 
+  xlab("") + 
+  coord_flip() + 
+  ggtitle("Most abundand genera > 1% (16S)") + 
+  facet_wrap(~barcode) +
+  guides(size = FALSE) # remove n=1
+```
+## Pathogenic genera
+```{r}
+ggplot(data = amplicon_dt[genus %in% PATHOGENIC_GENERA,], 
+       aes(x=reorder(genus, desc(abundance)), 
+           y=abundance, 
+           fill=sample)) + 
+  geom_bar(stat="sum", position="dodge", width = 0.7)  +
+  xlab("") + 
+  coord_flip() +
+  scale_y_continuous(guide = guide_axis(angle = 45)) +
+  ggtitle("Potentially pathogenic genera (16S)") + 
+  facet_wrap(~barcode) + 
+  guides(size = FALSE)
+```
+
+## Leptospira 
+```{r}
+ggplot(data = amplicon_dt[genus == "Leptospira", ],  
+       aes(x=reorder(species, desc(abundance)), 
+           y=abundance, 
+           fill=sample)) + 
+  geom_bar(stat="sum", position="dodge", width = 0.7)  +
+  xlab("") + 
+  coord_flip() +
+  scale_y_continuous(guide = guide_axis(angle = 45)) +
+  ggtitle("Leptospira spp. (16S)") + 
+  facet_wrap(~barcode) + 
+  guides(size = FALSE)
+```
+## Overlaps 
+```{r}
+set1 <- c(unique(diamond_dt[genus != "", genus]), unique(sourmash_dt[genus != "", genus]))
+set2 <- unique(amplicon_dt[genus != "", genus])
+
+lst <- list(WGS_sourmash_diamond=set1,
+            amplicon_emu=set2)
+
+# load ggVennDiagram Package
+library("ggVennDiagram")
+  
+# use list as an input
+  
+# creating Venn diagram and displaying 
+# all sets
+ggVennDiagram(lst) 
 ```

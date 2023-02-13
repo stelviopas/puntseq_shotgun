@@ -12,20 +12,30 @@ ASSEMBLY_SAMPLES = ["shotgun_new","shotgun_fahad"]
 
 rule all:
 	input:
-# QC plots
-#		expand("results/current/nanoplot/{s}_NanoPlot-report.html", s=ALL_SAMPLES),
-		expand("results/current/vamb/{s}/bins/clusters.tsv", s=ASSEMBLY_SAMPLES),
-		expand("results/current/maxbin2/{s}/{s}.summary", s=ASSEMBLY_SAMPLES),
-                expand("results/current/metabat2/{s}/{s}", s=ASSEMBLY_SAMPLES)
-		
-             
+# QC plots #
+#	   #	expand("results/current/nanoplot/{s}_NanoPlot-report.html", s=ALL_SAMPLES),
+############		
+		expand("results/current/gtdbtk/{s}", s=ASSEMBLY_SAMPLES)
+# FULL PIPELINE #
+#		expand("results/current/vamb/{s}/bins/clusters.tsv", s=ASSEMBLY_SAMPLES),
+#		expand("results/current/maxbin2/{s}/{s}.summary", s=ASSEMBLY_SAMPLES),
+#               expand("results/current/metabat2/{s}/{s}", s=ASSEMBLY_SAMPLES),
+#		expand("results/current/vamb/{s}/bins/contig_lengths.csv", s=ASSEMBLY_SAMPLES),
+#		"results/current/amplicon/amplicon_new.fasta", "results/current/amplicon/amplicon_fahad.fasta"	
+################
+
+
+
 # the snakemake files that run the different parts of the pipeline
 include: "rules/guppy.smk"
 include: "rules/guppy_barcoder.smk"
 include: "rules/porechop.smk"
 include: "rules/nanoplot.smk"
+include: "rules/fastqc.smk"
+include: "rules/samtools.smk"
 include: "rules/nanofilt.smk"
 include: "rules/flye.smk"
+include: "rules/map2reference.smk"
 include: "rules/minimap2_raconX.smk"
 include: "rules/medaka_1_align.smk"
 include: "rules/medaka_2_consensus.smk"
@@ -34,3 +44,7 @@ include: "rules/bioawk.smk"
 include: "rules/metabat2.smk"
 include: "rules/vamb_workflow.smk"
 include: "rules/maxbin2.smk"
+include: "rules/filter_vamb_bins.smk"
+include: "rules/das_tools.smk"
+include: "rules/coverm.smk"
+include: "rules/gtdbtk.smk"

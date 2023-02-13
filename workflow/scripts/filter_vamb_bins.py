@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import vamb 
 import os
 import pandas as pd 
@@ -40,7 +39,5 @@ def save_bins(path2vamb, maxbins, filter=False, lengths_to_csv=False):
 	print("Bins saved: ", len(filtered_bins))
 	vamb.vambtools.write_bins(os.path.join(path2vamb, 'filtered_bins'), filtered_bins, fastadict, maxbins=maxbins)
 
-if __name__ == "__main__":
-	path2vamb = '/home/haicu/anastasiia.grekova/workspace/puntseqWGS/results/current/vamb/shotgun_fahad/bins/'
-	save_bins(path2vamb, maxbins = 50000, filter=True, lengths_to_csv=True)
-
+path2vamb = '/home/haicu/anastasiia.grekova/workspace/puntseqWGS/results/current/vamb/shotgun_new/bins/'
+save_bins(path2vamb, maxbins = 50000, filter=True, lengths_to_csv=True)

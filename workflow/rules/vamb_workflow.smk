@@ -103,5 +103,5 @@ rule vamb:
         """
            vamb --outdir {params.dir}/out --fasta {input.catalog} --bamfiles {input.bam} 2>{log}
            mv {params.dir}/out/* {params.dir}/bins
-           rm -r {params.dir}/out/*
+           rm -r {params.dir}/out
 	"""
