@@ -36,7 +36,7 @@ runs_dt <- rbindlist(tables, idcol = "run")
 runs_dt$run <- str_replace(runs_dt$run, 'fastq_new', "Guppy v6.3.7+532d626")
 runs_dt$run <- str_replace(runs_dt$run, 'fastq_fahad', "Guppy v4.0.14")
 
-ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d() + scale_fill_continuous(type = "viridis") + geom_vline(xintercept = 1500) + scale_x_log10(labels=comma) + theme_bw() + facet_wrap(~run) + xlab("Read lengths") + ylab("Average read quality")
+ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d() + scale_fill_continuous(type = "run") + geom_vline(xintercept = 1500) + scale_x_log10(labels=comma) + theme_bw() + facet_wrap(~run) + xlab("Read lengths") + ylab("Average read quality")
 ``` 
 
 # MAGpy shotgun
@@ -207,35 +207,6 @@ ggplot(data = bin_lengths, aes(x=sample, y=bin_lengths)) +
   scale_y_log10(labels=comma) + 
   xlab("bp")
 ```
-# IDTaxa 
-
-Define the training set
-```{r}
-library(DECIPHER)
-#http://www2.decipher.codes/Classification/TrainingSets/SILVA_SSU_r138_2019.RData
-load("resources/databases/SILVA_SSU_r138_2019.RData")
-```
-Load the test data.
-
-Which data is inside?  
-1. Filtered reads between 1400 and 1600 bp 
-2. Combine all barcodes from new and old basecalling together into 
-amplicon_fahad.fasta
-amplicon_new.fasta
-
-```{r}
-amplicon_new_BC02 <- readDNAStringSet("results/current/amplicon/BC02_new.filtered.fasta")
-amplicon_new_BC02_result <- IdTaxa(amplicon_new, 
-                              trainingSet, 
-                              strand = 'both', 
-                              type="extended", 
-                              threshold = 0, 
-                              processors = NULL,
-                              verbose = TRUE)
-```
-
-
-
 # 16S EMU
 Tidy a data table.
 ```{r}
@@ -253,13 +224,16 @@ amplicon_dt <- rbindlist(tables, idcol = 'filepath')
 amplicon_dt <- amplicon_dt %>% separate(filepath, c("barcode", "sample", NA))
 amplicon_dt$sample <- str_replace(amplicon_dt$sample, 'new', "Guppy v6.3.7")
 amplicon_dt$sample <- str_replace(amplicon_dt$sample, 'porechop', "Guppy v4.0.14")
+# relative abundance in percent
+amplicon_dt[, abundance := abundance*100]
 ```
 Not possible to show all genera because too many, but we can separate the visualization into several parts. 
 ## Most abundant genera
 ```{r}
-ggplot(data = amplicon_dt[abundance > 0.01, ], aes(x=reorder(genus, desc(abundance)), y=abundance, fill=sample)) + 
+ggplot(data = amplicon_dt[abundance > 1, ], aes(x=reorder(genus, desc(abundance)), y=abundance, fill=sample)) + 
   geom_bar(stat="sum", position="dodge") + 
   xlab("") + 
+  ylab("abundance %") +
   coord_flip() + 
   ggtitle("Most abundand genera > 1% (16S)") + 
   facet_wrap(~barcode) +
@@ -273,6 +247,7 @@ ggplot(data = amplicon_dt[genus %in% PATHOGENIC_GENERA,],
            fill=sample)) + 
   geom_bar(stat="sum", position="dodge", width = 0.7)  +
   xlab("") + 
+  ylab("abundance %") +
   coord_flip() +
   scale_y_continuous(guide = guide_axis(angle = 45)) +
   ggtitle("Potentially pathogenic genera (16S)") + 
@@ -288,6 +263,7 @@ ggplot(data = amplicon_dt[genus == "Leptospira", ],
            fill=sample)) + 
   geom_bar(stat="sum", position="dodge", width = 0.7)  +
   xlab("") + 
+  ylab("abundance %") +
   coord_flip() +
   scale_y_continuous(guide = guide_axis(angle = 45)) +
   ggtitle("Leptospira spp. (16S)") + 
@@ -310,4 +286,150 @@ library("ggVennDiagram")
 # creating Venn diagram and displaying 
 # all sets
 ggVennDiagram(lst) 
+```
+
+## 16S vs WGS 
+Load the coverm abundance estimations of WGS 
+```{r}
+# concatenate fahad and new data to one df 
+files <- list.files(path = 'results/current/coverm/',
+                    full.names = TRUE,
+                    pattern= "*.txt") 
+# name the list elements by the filenames 
+names(files) <- basename(files)
+# read all files at once into a list of data.tables
+tables <- lapply(files, fread)
+# bind all tables into one using rbindlist, 
+# keeping the list names (the filenames) as an id column. 
+coverm_dt <- rbindlist(tables, idcol = 'filepath')
+
+coverm_dt$filepath <- str_replace(coverm_dt$filepath, 'shotgun_new_summary.txt', "Guppy v6.3.7")
+coverm_dt$filepath <- str_replace(coverm_dt$filepath, 'shotgun_fahad_summary.txt', "Guppy v4.0.14")
+
+setnames(coverm_dt, c("sample", "genome", "abundance"))
+coverm_dt
+```
+Load the GTDB taxonomy 
+```{r}
+# concatenate fahad and new data to one df 
+files <- c('results/current/gtdbtk/shotgun_new/shotgun_new.bac120.summary.tsv', 'results/current/gtdbtk/shotgun_fahad/shotgun_fahad.bac120.summary.tsv') 
+# name the list elements by the filenames 
+names(files) <- basename(files)
+# read all files at once into a list of data.tables
+tables <- lapply(files, fread)
+# bind all tables into one using rbindlist, 
+# keeping the list names (the filenames) as an id column. 
+taxonomy_dt <- rbindlist(tables, idcol = 'filepath')
+
+taxonomy_dt$filepath <- str_replace(taxonomy_dt$filepath, "shotgun_new.bac120.summary.tsv", "Guppy v6.3.7")
+taxonomy_dt$filepath <- str_replace(taxonomy_dt$filepath, "shotgun_fahad.bac120.summary.tsv", "Guppy v4.0.14")
+
+taxonomy_dt <- taxonomy_dt[, .(filepath, user_genome, classification)] %>% setnames(., c("sample", "genome", "classification")) %>% separate(., col = classification, sep = ';',
+                                                                                                                                    into = c("superkingdom", "phylum",
+                                                                                                                                             "class", "order", 
+                                                                                                                                             "family", "genus", 
+                                                                                                                                             "species"))
+taxonomy_dt$superkingdom <- str_replace(taxonomy_dt$superkingdom, "d__", "")
+taxonomy_dt$phylum <- str_replace(taxonomy_dt$phylum, "p__", "")
+taxonomy_dt$class <- str_replace(taxonomy_dt$class, "c__", "")
+taxonomy_dt$order <- str_replace(taxonomy_dt$order, "o__", "")
+taxonomy_dt$family <- str_replace(taxonomy_dt$family, "f__", "")
+taxonomy_dt$genus <- str_replace(taxonomy_dt$genus, "g__", "")
+taxonomy_dt$species <- str_replace(taxonomy_dt$species, "s__", "")
+taxonomy_dt[taxonomy_dt == ""] <- NA
+```
+
+Compose clean shotgun data
+
+```{r}
+shotgun_dt <- merge.data.table(taxonomy_dt, coverm_dt, by = c("sample", "genome"))
+shotgun_dt[order(abundance, decreasing=T),]
+```
+
+Hierarchical clustering between 16S and WGS new Guppy
+
+```{r}
+# extract abundances 
+shotgun_new_phylum_abun_dt <- shotgun_dt[sample == "Guppy v6.3.7", c("phylum", "abundance")] %>% .[,.(sum(abundance),
+                                                                                                    sample = "shotgun"), by="phylum"] %>% select(phylum, sample, V1) %>% setnames(., c("phylum", "sample", "abundance"))
+# add unclassified from coverm
+shotgun_new_phylum_abun_dt <- rbindlist(list(shotgun_new_phylum_abun_dt, data.table(phylum ="unclassified", 
+                                                                                    sample = "shotgun", 
+                                                                                    abundance = coverm_dt[sample == 'Guppy v6.3.7' & genome == 'unmapped', abundance])))
+# convert to wide format
+shotgun_new_phylum_abun_dt <- dcast(shotgun_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
+#replace old NCBI taxonomy 
+# [TODO] automatically 
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Actinobacteriota', 'Actinobacteria')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Bacteroidota', 'Bacteroidetes')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Chloroflexota', 'Chloroflexi')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Dependentiae', 'Candidatus Dependentiae')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Nitrospirota', 'Nitrospirae')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Patescibacteria', 'Candidatus Gracilibacteria')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Verrucomicrobiota', 'Verrucomicrobia')
+
+# extract abundances 
+amplicon_new_phylum_abun_dt <- amplicon_dt[sample == "Guppy v6.3.7", c("phylum", "abundance", "barcode")] %>% .[,sum(abundance), by=c("phylum", "barcode")] %>% setnames(., c("phylum", "sample", "abundance"))
+
+# add unclassified 
+amplicon_new_phylum_abun_dt<- replace(amplicon_new_phylum_abun_dt, amplicon_new_phylum_abun_dt=='', "unclassified")
+
+# convert to wide format
+amplicon_new_phylum_abun_dt <- dcast(amplicon_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
+
+comparison_dt <- merge.data.table(shotgun_new_phylum_abun_dt, 
+                 amplicon_new_phylum_abun_dt, 
+                 all=TRUE,
+                 by="phylum",
+                 allow.cartesian=TRUE)
+comparison_dt[is.na(comparison_dt)] <- 0
+
+mat <- as.matrix(comparison_dt[, c( "shotgun",
+                                   "BC02",
+                                   "BC03",
+                                   "BC04")])
+
+rownames(mat) <- comparison_dt$phylum
+colnames(mat) <- c( "shotgun", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
+head(mat)
+
+comparison_low_abun_dt <- comparison_dt[(shotgun != 0) & 
+                                          (shotgun < 70) &
+                                          (BC02 < 70) &
+                                          (BC02 != 0) &
+                                          (BC03 < 70) &
+                                          (BC03 != 0) &
+                                          (BC04 < 70) &
+                                          (BC04 != 0), ]
+
+low_abun_mat <- as.matrix(comparison_low_abun_dt[, c( "shotgun",
+                                   "BC02",
+                                   "BC03",
+                                   "BC04")])
+
+rownames(low_abun_mat) <- comparison_low_abun_dt$phylum
+colnames(low_abun_mat) <- c( "shotgun", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
+head(low_abun_mat)
+```
+Plot the comparison 
+
+```{r}
+library(pheatmap) 
+library(RColorBrewer)
+
+pheatmap(mat, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)),
+         breaks = breaksList, 
+         cluster_rows=TRUE, 
+         cluster_cols=TRUE,
+         fontsize_row = 8,
+         angle_col = 45,
+         display_numbers = TRUE) + scale_fill_continuous(limits = c(0,100), breaks = c(0, 10, 20, 80, 100))
+
+pheatmap(low_abun_mat, 
+         cluster_rows=TRUE, 
+         cluster_cols=TRUE,
+         angle_col = 45,
+         display_numbers = TRUE)
+
 ```
