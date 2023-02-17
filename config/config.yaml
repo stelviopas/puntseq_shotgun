@@ -18,7 +18,10 @@ amplicon:
 # samples for QC report via Nanoplot        
 qc_input:
         # reference-mapped reads
-        leptospira_interrogans_shotgun_new: "results/current/samtools/leptospira_interrogans_shotgun_new.fastq" 
+        leptospira_interrogans_shotgun_new_q5: "results/current/samtools/leptospira_interrogans_shotgun_new_q5.fastq"
+        leptospira_interrogans_shotgun_new_q10: "results/current/samtools/leptospira_interrogans_shotgun_new_q25.fastq"
+        leptospira_interrogans_shotgun_new_q20: "results/current/samtools/leptospira_interrogans_shotgun_new_q20.fastq" 
+        leptospira_interrogans_shotgun_new_q30: "results/current/samtools/leptospira_interrogans_shotgun_new_q30.fastq"
         # filtered
         shotgun_new_filtered:   "results/current/nanofilt/shotgun_new.filtered.fastq.gz"
         BC02_new_filtered: "results/current/nanofilt/BC02_new.filtered.fastq.gz"

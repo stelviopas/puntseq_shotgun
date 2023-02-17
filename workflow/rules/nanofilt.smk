@@ -22,13 +22,13 @@ rule nanofilt:
         shell:
                 "gunzip -c {input} | NanoFilt -q {params.q} -l {params.l} | gzip > {output}"
 
-rule nanofilt_manual:
-        input: "results/current/samtools/leptospira_interrogans_shotgun_new.fastq"
-        output: "results/current/nanofilt/leptospira_interrogans_shotgun_new.filtered.fastq.gz"
+rule manual_nanofilt:
+        input: "results/current/samtools/leptospira_interrogans_shotgun_new_{mapq}.fastq"
+        output: "results/current/manual_nanofilt/leptospira_interrogans_shotgun_new_{mapq}.filtered.fastq.gz"
         resources:
                 mem_mb=config["nanofilt"]["memory"]
         log:
-                "logs/nanofilt/leptospira_interrogans_shotgun_new.log"
+                "logs/manual_nanofilt/leptospira_interrogans_shotgun_new_{mapq}.log"
         conda:
                 "../envs/nanofilt.yaml"
         params:
