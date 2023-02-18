@@ -25,18 +25,18 @@ TODO I do not know how to fix the error on the server; however the plot is anywa
 require("reticulate")
 #only activate once 
 #conda_create("pickle", python_version = "3.9")
-use_condaenv("pickle")
+#use_condaenv("pickle")
 #conda_install("pickle", "pandas")
 
-source_python("workflow/scripts/pickle_reader.py")
-fastq_new_dt <- data.table(read_pickle_file("qc_plots/shotgun_new_NanoPlot-data.pickle"))
-fastq_fahad_dt <- data.table(read_pickle_file("qc_plots/shotgun_fahad_NanoPlot-data.pickle"))
-tables <- list(fastq_new = fastq_new_dt, fastq_fahad=fastq_fahad_dt)
-runs_dt <- rbindlist(tables, idcol = "run")
-runs_dt$run <- str_replace(runs_dt$run, 'fastq_new', "Guppy v6.3.7+532d626")
-runs_dt$run <- str_replace(runs_dt$run, 'fastq_fahad', "Guppy v4.0.14")
+#source_python("workflow/scripts/pickle_reader.py")
+#fastq_new_dt <- data.table(read_pickle_file("qc_plots/shotgun_new_NanoPlot-data.pickle"))
+#fastq_fahad_dt <- data.table(read_pickle_file("qc_plots/shotgun_fahad_NanoPlot-data.pickle"))
+#tables <- list(fastq_new = fastq_new_dt, fastq_fahad=fastq_fahad_dt)
+#runs_dt <- rbindlist(tables, idcol = "run")
+#runs_dt$run <- str_replace(runs_dt$run, 'fastq_new', "Guppy v6.3.7+532d626")
+#runs_dt$run <- str_replace(runs_dt$run, 'fastq_fahad', "Guppy v4.0.14")
 
-ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d() + scale_fill_continuous(type = "run") + geom_vline(xintercept = 1500) + scale_x_log10(labels=comma) + theme_bw() + facet_wrap(~run) + xlab("Read lengths") + ylab("Average read quality")
+#ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d() + scale_fill_continuous(type = "run") + geom_vline(xintercept = 1500) + scale_x_log10(labels=comma) + theme_bw() + facet_wrap(~run) + xlab("Read lengths") + ylab("Average read quality")
 ``` 
 
 # MAGpy shotgun
@@ -270,6 +270,21 @@ ggplot(data = amplicon_dt[genus == "Leptospira", ],
   facet_wrap(~barcode) + 
   guides(size = FALSE)
 ```
+## Leptospira 
+```{r}
+ggplot(data = amplicon_dt[genus == "Arcobacter", ],  
+       aes(x=reorder(species, desc(abundance)), 
+           y=abundance, 
+           fill=sample)) + 
+  geom_bar(stat="sum", position="dodge", width = 0.7)  +
+  xlab("") + 
+  ylab("abundance %") +
+  coord_flip() +
+  scale_y_continuous(guide = guide_axis(angle = 45)) +
+  ggtitle("Arcobacter spp. (16S)") + 
+  facet_wrap(~barcode) + 
+  guides(size = FALSE)
+```
 ## Overlaps 
 ```{r}
 set1 <- c(unique(diamond_dt[genus != "", genus]), unique(sourmash_dt[genus != "", genus]))
@@ -393,20 +408,17 @@ rownames(mat) <- comparison_dt$phylum
 colnames(mat) <- c( "shotgun", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
 head(mat)
 
-comparison_low_abun_dt <- comparison_dt[(shotgun != 0) & 
-                                          (shotgun < 70) &
-                                          (BC02 < 70) &
-                                          (BC02 != 0) &
-                                          (BC03 < 70) &
-                                          (BC03 != 0) &
-                                          (BC04 < 70) &
-                                          (BC04 != 0), ]
+rescale_abundance <- function(abundance) {100*abundance/sum(abundance)}
 
-low_abun_mat <- as.matrix(comparison_low_abun_dt[, c( "shotgun",
-                                   "BC02",
-                                   "BC03",
-                                   "BC04")])
-
+comparison_low_abun_dt <- comparison_dt[(phylum != 'unclassified'),] %>% .[,.(scaled_shotgun = rescale_abundance(shotgun),
+                                                                         scaled_BC02 = rescale_abundance(BC02),
+                                                                         scaled_BC03 = rescale_abundance(BC03),
+                                                                         scaled_BC04 = rescale_abundance(BC04),
+                                                                         phylum)]
+low_abun_mat <- as.matrix(comparison_low_abun_dt[, c( "scaled_shotgun",
+                                   "scaled_BC02",
+                                   "scaled_BC03",
+                                   "scaled_BC04")])
 rownames(low_abun_mat) <- comparison_low_abun_dt$phylum
 colnames(low_abun_mat) <- c( "shotgun", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
 head(low_abun_mat)
@@ -417,6 +429,8 @@ Plot the comparison
 library(pheatmap) 
 library(RColorBrewer)
 
+breaksList = seq(0, 100, by = 5)
+
 pheatmap(mat, 
          color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)),
          breaks = breaksList, 
@@ -424,12 +438,16 @@ pheatmap(mat,
          cluster_cols=TRUE,
          fontsize_row = 8,
          angle_col = 45,
-         display_numbers = TRUE) + scale_fill_continuous(limits = c(0,100), breaks = c(0, 10, 20, 80, 100))
+         display_numbers = TRUE) 
 
 pheatmap(low_abun_mat, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)),
+         breaks = breaksList, 
          cluster_rows=TRUE, 
          cluster_cols=TRUE,
+         fontsize_row = 8,
          angle_col = 45,
-         display_numbers = TRUE)
+         display_numbers = TRUE) 
+
 
 ```
