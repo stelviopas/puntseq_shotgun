@@ -1,0 +1,25 @@
+SAMPLES = ["BC02_new.filtered", "BC03_new.filtered", "BC04_new.filtered" ,"BC02_porechop_fahad.filtered", "BC03_porechop_fahad.filtered", "BC04_porechop_fahad.filtered"] 
+
+rule all:
+    input: expand("results/{sample}_rel-abundance.tsv", sample=SAMPLES)
+
+"""
+rule unzip_fastq:
+	threads: 16
+        input:  
+                fq="samples/current/{sample}.fastq.gz"
+	output:
+		temp="tmp/{sample}.fastq"
+	shell:
+		"gzip -d -c {input.fq} > {output.temp}"
+"""
+
+rule emu_abundance:
+	threads: 16
+	input: 
+		fq="samples/current/{sample}.fastq"
+	output:
+		"results/{sample}_rel-abundance.tsv"
+	shell:
+		"emu abundance {input.fq} --db emu_database --output-basename {wildcards.sample} --keep-counts --threads {threads}"
+
