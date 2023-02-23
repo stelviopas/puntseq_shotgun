@@ -17,6 +17,7 @@ library(reticulate)
 library(Rcpp)
 library(forcats)
 library(patchwork)
+library(xtable)
 ```
 # Quality control 
 TODO I do not know how to fix the error on the server; however the plot is anyways complete 
@@ -360,16 +361,59 @@ Compose clean shotgun data
 shotgun_dt <- merge.data.table(taxonomy_dt, coverm_dt, by = c("sample", "genome"))
 shotgun_dt[order(abundance, decreasing=T),]
 ```
+BugSeq taxonomy profiling from read-based shotgun data. 
+```{r}
+bugseq_dt <- fread('results/current/bugseq/metagenomic_classification/read-based/shotgun_new.filtered-reads.kreport')
+colnames(bugseq_dt) <- c('abundance', 'read_count_taxon_and_below', 'read_count_taxon', 'rank', 'ncbi_id', 'name')
 
-Hierarchical clustering between 16S and WGS new Guppy
+bugseq_dt[(rank == 'P') | (name == 'unclassified'), sum(abundance)] # 99.41% total abundance because some of the low abundant taxa were rounded to 0
+#recalculate abundance from read counts 
+
+N_reads <- bugseq_dt[(name == 'unclassified') | (name == 'root'), sum(read_count_taxon_and_below)]
+
+bugseq_phylum_abun_dt <- bugseq_dt[(rank == 'P') | (name == 'unclassified'), .(phylum = name, 
+                                                      shotgun_read = read_count_taxon_and_below*100/N_reads)]
+# add superkingdom annotation
+kingdom_phylum <- bugseq_dt[rank %in% c('D','P'), name]
+indices <- which(kingdom_phylum %in% c('Bacteria', "Eukaryota", "Archaea", "Viruses"))
+kingdom_lst <- list(Bacteria = kingdom_phylum[(indices[1]+1): (indices[2]-1)],
+                    Eykaryota = kingdom_phylum[(indices[2]+1):(indices[3]-1)],
+                    Archaea = kingdom_phylum[(indices[3]+1):(indices[4]-1)],
+                    Viruses = kingdom_phylum[(indices[4]+1):length(kingdom_phylum)])
+
+
+bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Bacteria, superkingdom := 'Bacteria']
+bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Eykaryota, superkingdom := 'Eykaryota']
+bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Archaea, superkingdom := 'Archaea']
+bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Viruses, superkingdom := 'Viruses']
+
+#convert to old NCBI taxonomy 
+# check Planctomyce -> should be the same 
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Bacteroidota', 'Bacteroidetes')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Chloroflexota', 'Chloroflexi')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Dependentiae', 'Candidatus Dependentiae')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Nitrospirota', 'Nitrospirae')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Patescibacteria', 'Candidatus Gracilibacteria')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Verrucomicrobiota', 'Verrucomicrobia')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Actinomycetota', 'Actinobacteria')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Bacillota', 'Firmicutes')
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, "Tenericutes", "Mycoplasmatota")
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, "Pseudomonadota", "Proteobacteria")
+bugseq_phylum_abun_dt[phylum == 'unclassified', superkingdom := 'unclassified']
+
+bugseq_phylum_abun_dt
+```
+
+Shotgun taxonomy profiling.
 
 ```{r}
 # extract abundances 
-shotgun_new_phylum_abun_dt <- shotgun_dt[sample == "Guppy v6.3.7", c("phylum", "abundance")] %>% .[,.(sum(abundance),
-                                                                                                    sample = "shotgun"), by="phylum"] %>% select(phylum, sample, V1) %>% setnames(., c("phylum", "sample", "abundance"))
+shotgun_new_phylum_abun_dt <- shotgun_dt[sample == "Guppy v6.3.7", c("superkingdom", "phylum", "abundance")] %>% .[,.(sum(abundance),
+                                                                                                    sample = "shotgun_assembly"), by=c("phylum", "superkingdom")] %>% select(superkingdom, phylum, sample, V1) %>% setnames(., c("superkingdom", "phylum", "sample", "abundance"))
 # add unclassified from coverm
 shotgun_new_phylum_abun_dt <- rbindlist(list(shotgun_new_phylum_abun_dt, data.table(phylum ="unclassified", 
-                                                                                    sample = "shotgun", 
+                                                                                    superkingdom ="unclassified",
+                                                                                    sample = "shotgun_assembly", 
                                                                                     abundance = coverm_dt[sample == 'Guppy v6.3.7' & genome == 'unmapped', abundance])))
 # convert to wide format
 shotgun_new_phylum_abun_dt <- dcast(shotgun_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
@@ -382,72 +426,155 @@ shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phyl
 shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Nitrospirota', 'Nitrospirae')
 shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Patescibacteria', 'Candidatus Gracilibacteria')
 shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Verrucomicrobiota', 'Verrucomicrobia')
-
+shotgun_new_phylum_abun_dt
+```
+Amplicon taxonomy profiling 
+```{r}
 # extract abundances 
-amplicon_new_phylum_abun_dt <- amplicon_dt[sample == "Guppy v6.3.7", c("phylum", "abundance", "barcode")] %>% .[,sum(abundance), by=c("phylum", "barcode")] %>% setnames(., c("phylum", "sample", "abundance"))
+amplicon_new_phylum_abun_dt <- amplicon_dt[sample == "Guppy v6.3.7", c("superkingdom", "phylum", "abundance", "barcode")] %>% .[,sum(abundance), by=c("superkingdom", "phylum", "barcode")] %>% setnames(., c("superkingdom", "phylum", "sample", "abundance"))
 
 # add unclassified 
-amplicon_new_phylum_abun_dt<- replace(amplicon_new_phylum_abun_dt, amplicon_new_phylum_abun_dt=='', "unclassified")
+amplicon_new_phylum_abun_dt <- replace(amplicon_new_phylum_abun_dt, amplicon_new_phylum_abun_dt=='', "unclassified")
 
 # convert to wide format
 amplicon_new_phylum_abun_dt <- dcast(amplicon_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
+amplicon_new_phylum_abun_dt <- amplicon_new_phylum_abun_dt[!((BC02 == 0) & (BC03 == 0) & (BC04 ==0)),]
+amplicon_new_phylum_abun_dt[phylum == 'unclassified', superkingdom := 'unclassified']
+amplicon_new_phylum_abun_dt
+```
+Merged taxonomy profile from amplicon, shotgun_read and shotgun_assembly 
+
+```{r}
 
 comparison_dt <- merge.data.table(shotgun_new_phylum_abun_dt, 
                  amplicon_new_phylum_abun_dt, 
                  all=TRUE,
-                 by="phylum",
+                 by=c("superkingdom", "phylum"),
+                 allow.cartesian=TRUE)
+
+comparison_dt <- merge.data.table(comparison_dt, 
+                 bugseq_phylum_abun_dt, 
+                 all=TRUE,
+                 by=c("superkingdom", "phylum"),
                  allow.cartesian=TRUE)
 comparison_dt[is.na(comparison_dt)] <- 0
 
-mat <- as.matrix(comparison_dt[, c( "shotgun",
+comparison_dt
+
+mat <- as.matrix(comparison_dt[, c( "shotgun_assembly",
+                                    "shotgun_read",
                                    "BC02",
                                    "BC03",
                                    "BC04")])
 
 rownames(mat) <- comparison_dt$phylum
-colnames(mat) <- c( "shotgun", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
+colnames(mat) <- c( "shotgun_assembly", "shotgun_read", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
 head(mat)
 
-rescale_abundance <- function(abundance) {100*abundance/sum(abundance)}
-
-comparison_low_abun_dt <- comparison_dt[(phylum != 'unclassified'),] %>% .[,.(scaled_shotgun = rescale_abundance(shotgun),
-                                                                         scaled_BC02 = rescale_abundance(BC02),
-                                                                         scaled_BC03 = rescale_abundance(BC03),
-                                                                         scaled_BC04 = rescale_abundance(BC04),
-                                                                         phylum)]
-low_abun_mat <- as.matrix(comparison_low_abun_dt[, c( "scaled_shotgun",
-                                   "scaled_BC02",
-                                   "scaled_BC03",
-                                   "scaled_BC04")])
-rownames(low_abun_mat) <- comparison_low_abun_dt$phylum
-colnames(low_abun_mat) <- c( "shotgun", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
-head(low_abun_mat)
 ```
+Create row annotation 
+```{r}
+# create the row annotation data frame
+row.ann <- data.frame(superkingdom = comparison_dt[, superkingdom])
+rownames(row.ann) <- comparison_dt$phylum 
+row.ann
+```
+
 Plot the comparison 
 
 ```{r}
 library(pheatmap) 
 library(RColorBrewer)
 
-breaksList = seq(0, 100, by = 5)
+real_zero_color <- brewer.pal(n=9, name='Pastel1')[9]
+paletteLength <- 9
+
+color <- colorRampPalette(c(real_zero_color, brewer.pal(n = 4, name = "Blues")))(paletteLength)
+annotation_colors <- brewer.pal(n=7, name='Pastel1')[4:7]
+
+
+# length(breaks) == length(paletteLength) + 1
+# use floor and ceiling to deal with even/odd length pallettelengths
+
+breaks <- c(seq(min(mat), 0.00000001, length.out=ceiling(paletteLength/2) + 1), 
+              seq(max(mat)/paletteLength, 100, length.out=floor(paletteLength/2)))
 
 pheatmap(mat, 
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)),
-         breaks = breaksList, 
+         color = color,
+         breaks = breaks,
          cluster_rows=TRUE, 
          cluster_cols=TRUE,
          fontsize_row = 8,
          angle_col = 45,
-         display_numbers = TRUE) 
+         display_numbers = TRUE,
+         annotation_row = row.ann,
+         annotation_colors = list(superkingdom = c(Archaea=annotation_colors[1],
+                                                  Bacteria=annotation_colors[2],
+                                                  Eykaryota=annotation_colors[3],
+                                                  Viruses=annotation_colors[4],
+                                                  unclassified='white')),
+         cellheight = 8,
+         filename = 'all_abund_mat.png'
+         )
+```
+
+Only classified
+```{r}
+rescale_abundance <- function(abundance) {100*abundance/sum(abundance)}
+
+comparison_low_abun_dt <- comparison_dt[(phylum != 'unclassified'),] %>% .[,.(scaled_shotgun_assembly = rescale_abundance(shotgun_assembly), scaled_shotgun_read = rescale_abundance(shotgun_read),
+                                                                              scaled_BC02 = rescale_abundance(BC02),
+                                                                              scaled_BC03 = rescale_abundance(BC03),
+                                                                              scaled_BC04 = rescale_abundance(BC04),
+                                                                              phylum, superkingdom)]
+low_abun_mat <- as.matrix(comparison_low_abun_dt[, c( "scaled_shotgun_assembly",
+                                                      "scaled_shotgun_read",
+                                                      "scaled_BC02",
+                                                      "scaled_BC03",
+                                                      "scaled_BC04")])
+rownames(low_abun_mat) <- comparison_low_abun_dt$phylum
+colnames(low_abun_mat) <- c( "shotgun_assembly", "shotgun_read", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
+head(low_abun_mat)
+
+
+# create the row annotation data frame
+row.ann <- data.frame(superkingdom = comparison_low_abun_dt[, superkingdom])
+rownames(row.ann) <- comparison_low_abun_dt$phylum 
 
 pheatmap(low_abun_mat, 
-         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(length(breaksList)),
-         breaks = breaksList, 
+         color = color,
+         breaks = breaks, 
          cluster_rows=TRUE, 
          cluster_cols=TRUE,
          fontsize_row = 8,
          angle_col = 45,
-         display_numbers = TRUE) 
+         display_numbers = TRUE,
+         annotation_row = row.ann,
+         annotation_colors = list(superkingdom = c(Archaea=annotation_colors[1],
+                                                   Bacteria=annotation_colors[2],
+                                                   Eykaryota=annotation_colors[3],
+                                                   Viruses=annotation_colors[4])),
+         cellheight = 8,
+         filename = 'low_abund_mat.png') 
 
+```
+## In-detail comparison investigation 
+Two assembled phyla lacking in 16S and shotgun read mapping approaches. 
+```{r}
+target_phyla <- shotgun_dt[phylum %like% 'Dependentiae',] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum)]
 
+checkm_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_metabat.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, superkingdom = superkingdom.x, phylum = phylum.x, size, contigs, N50, n_genomes, n_markers, n_marker_sets, completeness, contamination, binScore, uniqueBacSCGs, uniqueArcSCGs   )]
+#print(xtable(target_phyla_info), include.rownames = TRUE, include.colnames = TRUE, sanitize.text.function = I)
+target_phyla_info
 ```
