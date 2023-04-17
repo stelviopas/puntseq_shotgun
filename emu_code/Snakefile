@@ -1,8 +1,9 @@
 SAMPLES = ["BC02_new.filtered", "BC03_new.filtered", "BC04_new.filtered" ,"BC02_porechop_fahad.filtered", "BC03_porechop_fahad.filtered", "BC04_porechop_fahad.filtered"] 
 
 rule all:
-    input: expand("results/{sample}_rel-abundance.tsv", sample=SAMPLES)
-
+	input:
+		"../resources/current/gtdb_r207_ssu" 
+		#expand("results/{sample}_rel-abundance.tsv", sample=SAMPLES)
 """
 rule unzip_fastq:
 	threads: 16
@@ -13,6 +14,19 @@ rule unzip_fastq:
 	shell:
 		"gzip -d -c {input.fq} > {output.temp}"
 """
+
+rule create_database: 
+	threads: 16
+        conda:
+                "../workflow/envs/emu.yaml"
+	input: 
+		sequences="../resources/current/ssu_all_r207.fna",
+		seq2tax="../resources/current/gtdb-taxdump/R207/taxid.map",
+		ncbi_taxonomy_dir="../resources/current/gtdb-taxdump/R207/"
+	output: 
+		db=directory("../resources/current/gtdb_r207_ssu")
+	shell: 
+		"emu build-database {output.db} --sequences {input.sequences} --seq2tax {input.seq2tax} --ncbi-taxonomy {input.ncbi_taxonomy_dir}"
 
 rule emu_abundance:
 	threads: 16

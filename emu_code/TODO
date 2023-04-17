@@ -1,0 +1,6 @@
+The emu code was modified to enable matching of non-unique IDs (SEVERAL 16S sequences per species)
+
+line 537: 
+        modified_id = record.id.split('~')[0].split('_')
+        modified_id = modified_id[1] + '_' + modified_id[2]
+        tid = seq2tax_dict[modified_id]
