@@ -18,28 +18,19 @@ amplicon:
 # samples for QC report via Nanoplot        
 qc_input:
         # reference-mapped reads
-        leptospira_interrogans_shotgun_new_q5: "results/current/samtools/leptospira_interrogans_shotgun_new_q5.fastq"
-        leptospira_interrogans_shotgun_new_q10: "results/current/samtools/leptospira_interrogans_shotgun_new_q25.fastq"
-        leptospira_interrogans_shotgun_new_q20: "results/current/samtools/leptospira_interrogans_shotgun_new_q20.fastq" 
-        leptospira_interrogans_shotgun_new_q30: "results/current/samtools/leptospira_interrogans_shotgun_new_q30.fastq"
+        #leptospira_interrogans_shotgun_new_q5: "results/current/samtools/leptospira_interrogans_shotgun_new_q5.fastq"
+        #leptospira_interrogans_shotgun_new_q10: "results/current/samtools/leptospira_interrogans_shotgun_new_q25.fastq"
+        #leptospira_interrogans_shotgun_new_q20: "results/current/samtools/leptospira_interrogans_shotgun_new_q20.fastq" 
+        #leptospira_interrogans_shotgun_new_q30: "results/current/samtools/leptospira_interrogans_shotgun_new_q30.fastq"
         # filtered
-        shotgun_new_filtered:   "results/current/nanofilt/shotgun_new.filtered.fastq.gz"
-        BC02_new_filtered: "results/current/nanofilt/BC02_new.filtered.fastq.gz"
-        BC03_new_filtered: "results/current/nanofilt/BC03_new.filtered.fastq.gz"
-        BC04_new_filtered: "results/current/nanofilt/BC04_new.filtered.fastq.gz"
-        shotgun_fahad_filtered: "results/current/nanofilt/shotgun_fahad.filtered.fastq.gz"
-        BC02_porechop_fahad_filtered: "results/current/nanofilt/BC02_porechop_fahad.filtered.fastq.gz"
-        BC03_porechop_fahad_filtered: "results/current/nanofilt/BC03_porechop_fahad.filtered.fastq.gz"
-        BC04_porechop_fahad_filtered: "results/current/nanofilt/BC04_porechop_fahad.filtered.fastq.gz"
-        # not filtered, but Guppy outputs Q > 9 automaticaly 
-        shotgun_new:   "results/current/guppy/demult/shotgun.fastq.gz"
-        BC02_new: "results/current/guppy/demult/BC02.fastq.gz"
-        BC03_new: "results/current/guppy/demult/BC03.fastq.gz"
-        BC04_new: "results/current/guppy/demult/BC04.fastq.gz"
-        shotgun_fahad: "resources/basecalled_from_fahad/current/shotgun.fastq.gz"
-        BC02_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC02.porechop.fastq.gz"
-        BC03_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC03.porechop.fastq.gz"
-        BC04_porechop_fahad: "resources/basecalled_from_fahad/current/16SBC04.porechop.fastq.gz"
+        shotgun_new_filtered:   "results/current/downsampled/shotgun_new.filtered.fastq.gz"
+        #BC02_new_filtered: "results/current/downsampled/BC02_new.filtered.fastq.gz"
+        #BC03_new_filtered: "results/current/downsampled/BC03_new.filtered.fastq.gz"
+        #BC04_new_filtered: "results/current/downsampled/BC04_new.filtered.fastq.gz"
+        shotgun_fahad_filtered: "results/current/downsampled/shotgun_fahad.filtered.fastq.gz"
+        #BC02_porechop_fahad_filtered: "results/current/downsampled/BC02_porechop_fahad.filtered.fastq.gz"
+        #BC03_porechop_fahad_filtered: "results/current/downsampled/BC03_porechop_fahad.filtered.fastq.gz"
+        #BC04_porechop_fahad_filtered: "results/current/downsampled/BC04_porechop_fahad.filtered.fastq.gz"
 
 guppy:
         input_path: "resources/raw/current/PuntSeq_fast5/"
@@ -54,24 +45,24 @@ guppy:
         chunk_size: 1000
         memory: 50000 
 porechop:
-        threads: 36
+        threads: 32
         memory: 100000
 nanoplot:
-        threads: 36
+        threads: 32
         memory: 100000
 fastqc:
-        threads: 36
+        threads: 32
         memory: 100000
 nanofilt:
         memory: 100000
-        threads: 36
+        threads: 32
         l: 200
         q: 9
         min_length: 1400
         max_length: 1600
 flye:
         memory: 100000
-        threads: 36
+        threads: 32
         model_flag: "--nano-raw"
         polish_rounds: 3 # Note: only for reference-based, for metagenome assembly i=1
 racon:
@@ -80,6 +71,7 @@ racon:
 minimap2:
         memory: 100000
         threads: 16
+        mapq: 'q20'
 medaka:
         align_threads: 64
         consensus_threads: 64
@@ -89,15 +81,16 @@ bioawk:
         threads: 1
         min_contig_length: 1000       
 metabat2:
-        threads: 36
+        threads: 32
 maxbin2:
-        threads: 36 
+        threads: 32 
 vamb_workflow:
         index_size: "64G"
 das_tool:
-        threads: 36
+        threads: 32
 coverm:
-        threads: 36
+        threads: 32
 gtdbtk:
-        threads: 64
-        db: "/lustre/groups/haicu/workspace/anastasiia.grekova/gtdbtk-2.1.1/db"
+        threads: 32
+        db: "pb-metagenomics-tools/Taxonomic-Profiling-Diamond-Megan/resources/current/gtdbtk_r207" 
+        #db: "/lustre/groups/haicu/workspace/anastasiia.grekova/gtdbtk-2.1.1/db"

@@ -3,7 +3,7 @@ rule medaka_align:
 	threads: config["medaka"]["align_threads"]
 	input:
 		prev_fa = "results/current/racon/{sample}.racon3/assembly.fasta",
-		fq = "results/current/nanofilt/{sample}.filtered.fastq.gz"
+		fq = "results/current/downsampled/{sample}.filtered.fastq.gz"
 	output:
 		bam = "results/current/medaka/{sample}.medaka1/calls_to_draft.bam",
 	log: "logs/medaka/{sample}.medaka1_align.txt"

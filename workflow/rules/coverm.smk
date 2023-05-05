@@ -9,8 +9,8 @@ rule coverm:
 	conda: "../envs/coverm.yaml"
 	threads: config["coverm"]["threads"]
 	input:
-		reads = "results/current/nanofilt/{sample}.filtered.fastq.gz",
-		bins = get_fa_bins
+		reads = "results/current/downsampled/{sample}.filtered.fastq.gz",
+		bins = dynamic(get_fa_bins)
 	output:
 		"results/current/coverm/{sample}_summary.txt"
 	log: "logs/coverm/{sample}.txt"

@@ -3,7 +3,7 @@ rule maxbin2:
 	threads: config["maxbin2"]["threads"]
 	input:
 		fa = "results/current/bioawk/{sample}.medaka1_filtered/assembly.fasta",
-		fq = "results/current/nanofilt/{sample}.filtered.fastq.gz"
+		fq = "results/current/downsampled/{sample}.filtered.fastq.gz"
 	output:
 		summary = "results/current/maxbin2/{sample}/{sample}.summary"
 	log: "logs/maxbin2/{sample}.txt"

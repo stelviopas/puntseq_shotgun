@@ -1,5 +1,5 @@
 rule flye:
-        input: "results/current/nanofilt/{sample}.filtered.fastq.gz"
+        input: "results/current/downsampled/{sample}.filtered.fastq.gz"
 	output: "results/current/flye/{sample}/assembly.fasta"
         threads:
                 config["flye"]["threads"]

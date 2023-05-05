@@ -49,7 +49,7 @@ rule dict:
 
 rule minimap:
     input:
-        fq = "results/current/nanofilt/{sample}.filtered.fastq.gz",
+        fq = "results/current/downsampled/{sample}.filtered.fastq.gz",
         mmi = "results/current/vamb/{sample}/contigs.flt.mmi",
         dict = "results/current/vamb/{sample}/contigs.flt.dict"
     output:

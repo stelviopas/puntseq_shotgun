@@ -14,7 +14,7 @@ def get_fasta_bins(wildcards):
 	return fastas
 
 rule harmonize_maxbin:
-	input: fastas=get_fasta_bins
+	input: fastas=dynamic(get_fasta_bins)
 	output: "results/current/maxbin2/{sample}/{sample}.tsv"
 	run: 
 		import pandas as pd 
@@ -38,7 +38,7 @@ def get_fna_bins(wildcards):
         return fnas
 
 rule harmonize_vamb:
-        input: fnas=get_fna_bins 
+        input: fnas=dynamic(get_fna_bins) 
         output: "results/current/vamb/{sample}/bins/filtered_bins/{sample}.tsv"
         run:
                 import pandas as pd

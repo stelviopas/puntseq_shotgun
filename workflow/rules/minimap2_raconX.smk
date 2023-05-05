@@ -6,7 +6,7 @@ rule minimap2_raconX:
 	threads: config["racon"]["threads"]
 	input:
 		prev_fa = "results/current/flye/{sample}/assembly.fasta",
-		fq = "results/current/nanofilt/{sample}.filtered.fastq.gz"
+		fq = "results/current/downsampled/{sample}.filtered.fastq.gz"
 	output:
 		fa = "results/current/racon/{sample}.racon{num}/assembly.fasta",
 		link = "results/current/racon/{sample}.racon{num}.fasta"
