@@ -1,0 +1,8 @@
+channels:
+- conda-forge
+- bioconda
+- defaults
+dependencies:
+- bioconda::metabat2=2.14
+name: metabat2-2.14
+prefix: /home/haicu/anastasiia.grekova/miniconda3/metabat2
