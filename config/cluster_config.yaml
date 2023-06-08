@@ -1,7 +1,7 @@
 # cluster_config.yml - cluster configuration
 __default__:
-     account: grekova
-     partition: cluster
-     time: 2-00:00:00 # time limit for each job in h:m:s
+     partition: cpu_p
+     qos: cpu
+     time: 02-00:00:00 # time limit for each job in h:m:s
      nodes: 4
-     mem: 100Gb
+     mem: 300G
