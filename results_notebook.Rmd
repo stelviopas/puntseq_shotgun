@@ -1,10 +1,10 @@
 ---
-title: "Puntseq WGS visualizations"
+title: "Visualization of Puntseq shotgun and amplicon sequencing processed data"
 output:
   html_document:
     df_print: paged
 ---
-
+Import libraries.
 ```{r}
 library(data.table)
 library(tidyr)
@@ -13,45 +13,83 @@ library(dplyr)
 library(RColorBrewer)
 library(scales)
 library(stringr)
-library(reticulate)
 library(Rcpp)
 library(forcats)
 library(patchwork)
 library(xtable)
+library(ggVennDiagram)
 ```
-# Quality control 
-TODO I do not know how to fix the error on the server; however the plot is anyways complete 
+# Quality control plots
+Nanoplot generates pickle files which contain dataframes used to create QC plots. This files are used for the following plots.
+
+[TODO]: I do not know how to fix the error on the server; however the plot is anyways complete 
 
 ```{r}
-require("reticulate")
+require('reticulate')
 #only activate once 
-#conda_create("pickle", python_version = "3.9")
-#use_condaenv("pickle")
-#conda_install("pickle", "pandas")
+#conda_create("pickle")
+#use_condaenv("pickle", conda = "/home/haicu/anastasiia.grekova/miniconda3/bin/conda")
+#conda_install("pickle", "pandas=1.4", python_version = "3.8")
 
 #source_python("workflow/scripts/pickle_reader.py")
-#fastq_new_dt <- data.table(read_pickle_file("qc_plots/shotgun_new_NanoPlot-data.pickle"))
-#fastq_fahad_dt <- data.table(read_pickle_file("qc_plots/shotgun_fahad_NanoPlot-data.pickle"))
-#tables <- list(fastq_new = fastq_new_dt, fastq_fahad=fastq_fahad_dt)
-#runs_dt <- rbindlist(tables, idcol = "run")
-#runs_dt$run <- str_replace(runs_dt$run, 'fastq_new', "Guppy v6.3.7+532d626")
-#runs_dt$run <- str_replace(runs_dt$run, 'fastq_fahad', "Guppy v4.0.14")
 
-#ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d() + scale_fill_continuous(type = "run") + geom_vline(xintercept = 1500) + scale_x_log10(labels=comma) + theme_bw() + facet_wrap(~run) + xlab("Read lengths") + ylab("Average read quality")
+fastq_new_dt <- data.table(read_pickle_file("results/current/nanoplot/shotgun_new_NanoPlot-data.pickle"))
+fastq_fahad_dt <- data.table(read_pickle_file("results/current/nanoplot/shotgun_fahad_NanoPlot-data.pickle"))
+
+tables <- list(fastq_new = fastq_new_dt, fastq_fahad=fastq_fahad_dt)
+runs_dt <- rbindlist(tables, idcol = "run")
+runs_dt$run <- str_replace(runs_dt$run, 'fastq_new', "Guppy v6.3.7")
+runs_dt$run <- str_replace(runs_dt$run, 'fastq_fahad', "Guppy v4.0.14")
+
+#geom_vline(xintercept = 1550)
+ggplot(data=runs_dt, aes(lengths, quals)) + geom_bin2d()  + scale_x_log10(labels=comma) + theme_bw() + facet_wrap(~run) + xlab("Read lengths") + ylab("Average read quality")
+ggsave(filename = 'results/current/plots/shotgun_qc_unfiltered.png', device = 'png')
 ``` 
 
+Amplicon QC
+```{r}
+# concatenate all 16S runs into one table 
+files <- list.files(path = 'results/current/nanoplot',
+                    full.names = TRUE,
+                    pattern= "^BC.*.pickle") 
+# name the list elements by the filenames 
+names(files) <- basename(files)
+# read all files at once into a list of data.tables
+tables <- lapply(files, read_pickle_file)
+tables <- lapply(tables, data.table)
+# bind all tables into one using rbindlist, 
+# keeping the list names (the filenames) as an id column. 
+amplicon_fastq_dt <- rbindlist(tables, idcol = 'filepath')
+amplicon_fastq_dt <- amplicon_fastq_dt %>% separate(., col = 'filepath', sep = '_', into = c('barcode', 'sample'))
+amplicon_fastq_dt$sample <- str_replace(amplicon_fastq_dt$sample, 'new', "Guppy v6.3.7")
+amplicon_fastq_dt$sample <- str_replace(amplicon_fastq_dt$sample, 'porechop', "Guppy v4.0.14")
+#
+ggplot(data=amplicon_fastq_dt, aes(lengths, quals)) + geom_bin2d()  + scale_x_log10(labels=comma) + theme_bw() + facet_grid(sample~barcode) + xlab("Read lengths") + ylab("Average read quality") + guides(x =  guide_axis(angle = 20))
+ggsave(filename = 'results/current/plots/amplicon_qc_unfiltered.png', device = 'png')
+```
 # MAGpy shotgun
+
 ## Prior knowledge 
+Following genera were called potential human pathogens by Urban, 2021. 
 ```{r}
 PATHOGENIC_GENERA <- c("Arcobacter", "Aeromonas", "Pseudomonas", 
                        "Legionella", "Escherichia", "Bacillus", 
-                       "Serratia", "Klebsiella", "ENterobacter", 
+                       "Serratia", "Klebsiella", "Enterobacter", 
                        "Yersinia", "Acinetobacter", "Coxiella",
                        "Salmonella", "Streptococcus", "Enterococcus",
                        "Clostridium", "Citrobacter", "Stenotrophomonas",
                        "Listeria", "Leptospira")
 ```
-## CheckM
+## MAGpy 
+MAGpy takes as input bins and runs several alignment tools and completeness/contamination QC. We binned the metagenomic assembly with three tools: 
+- Vamb
+- MaxBin 
+- Metabat 
+Here we anaylze the output of all binners together. 
+Later on, the bins were intergated with DAS_Tool and only several high quality bins were taken for final comparison of taxonomy. 
+### CheckM
+CheckM outputs completeness and contamination of the bins.
+
 Tidy a data table. 
 ```{r}
 checkm_dt <- fread("MAGpy/checkm_plus.txt")
@@ -61,6 +99,7 @@ checkm_dt <- checkm_dt %>% separate(col = "bin_id", into = c("shotgun", "samplet
                                                                                                              sampletmp, sep = "_") 
 checkm_dt$sample <- str_replace(checkm_dt$sample, 'shotgun_new', "Guppy v6.3.7")
 checkm_dt$sample <- str_replace(checkm_dt$sample, 'shotgun_fahad', "Guppy v4.0.14")
+head(checkm_dt)
 ```
 General distribution of completeness and contamination across all bins
 ```{r}
@@ -78,9 +117,11 @@ contamination_reduced <- ggplot(data = checkm_dt[contamination <= 100,], aes(x=s
   guides(x = guide_axis(angle = 45)) + 
   theme(axis.title.x = element_blank()) 
 
-completeness / contamination_reduced 
+bins_quality_plot <- completeness / contamination_reduced 
+bins_quality_plot
+ggsave(filename = 'results/current/plots/bins_violin.png', device = 'png')
 ```
-Number of bins
+Number of complete bins
 ```{r}
 cast_completeness <- function(completeness){
   if (completeness > 90) {
@@ -101,18 +142,21 @@ cast_completeness <- function(completeness){
 }
 bin_completeness <- checkm_dt %>% .[, stack := sapply(completeness, cast_completeness)] %>% .[, .(num_bins = .N), by=.(stack, binning_tool, sample)] %>% .[order(stack),]
 
-ggplot(data = bin_completeness, aes(x=binning_tool, y=num_bins, fill=stack)) + 
+bins_barplot <- ggplot(data = bin_completeness, aes(x=binning_tool, y=num_bins, fill=stack)) + 
   geom_bar(stat = "identity", 
            position="stack") + 
   ylab("number of bins") + 
   scale_fill_brewer(palette="Paired") +
   theme_minimal() + 
-  guides(fill=guide_legend(title = "binning tool")) + #change legend title 
+  guides(fill=guide_legend(title = "completeness")) + #change legend title 
   theme(axis.title.x = element_blank()) +
   facet_grid(~ sample)
+bins_barplot
+ggsave(filename = 'results/current/plots/bins_barplot.png', device = 'png')
 ``` 
 
 ## Sourmash 
+Sourmash is an alternative implementation of MinHash algorithm that uses fast searches with sequences bloom trees for taxonomic profiling.
 Tidy a data table
 ```{r}
 sourmash_dt <- fread("MAGpy/sourmash_report.csv")
@@ -120,13 +164,18 @@ sourmash_dt <- sourmash_dt %>% separate(ID, into = c(NA, "shotgun", "sample", "b
 
 sourmash_dt$sample <- str_replace(sourmash_dt$sample, 'shotgun_new', "Guppy v6.3.7")
 sourmash_dt$sample <- str_replace(sourmash_dt$sample, 'shotgun_fahad', "Guppy v4.0.14")
+head(sourmash_dt)
 ```
 Bins summary plot 
 ```{r}
-bins_summary_plot <- ggplot(data = sourmash_dt[genus != ""], aes(x = fct_infreq(genus), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
-bins_summary_plot + xlab("") + coord_flip() + ggtitle("Predicted genus by sourmash")
+bins_summary_plot <- ggplot(data = sourmash_dt[phylum != ""], aes(x = fct_infreq(phylum), fill = binning_tool)) + geom_bar(stat="count", position=position_dodge()) + ylab("Number of bins") + facet_grid(~sample) 
+sourmash_phyla <- bins_summary_plot + xlab("") + coord_flip() + ggtitle("Predicted phyla by sourmash")
+sourmash_phyla
+ggsave(filename = 'results/current/plots/sourmash_phyla.png', device = 'png')
 ```
 ## DIAMOND
+Protein homology search using space seeds using FM index with reduced amino acid alphabet. 
+
 Tidy the data table 
 ```{r}
 diamond_dt <- fread("MAGpy/diamond_bin_report_plus.tsv")
@@ -136,79 +185,54 @@ colnames(diamond_dt)[5] = "estimated_genus"
 diamond_dt <- diamond_dt %>% separate(., name, into = c("shotgun", "sample", "binning_tool", "bin_id")) %>% unite(col=sample, shotgun, sample, sep = "_")
 diamond_dt$sample <- str_replace(diamond_dt$sample , 'shotgun_new', "Guppy v6.3.7")
 diamond_dt$sample <- str_replace(diamond_dt$sample , 'shotgun_fahad', "Guppy v4.0.14")
-diamond_dt[,.N, by=.(family, sample)]
+head(diamond_dt)
 ```
 Bins summary plot 
 ```{r}
-ggplot(data = diamond_dt[genus != ""], aes(x = fct_infreq(genus), fill = binning_tool)) +
+diamond_phyla <- ggplot(data = diamond_dt[phylum != ""], aes(x = fct_infreq(phylum), fill = binning_tool)) +
   geom_bar(stat="count") + 
   ylab("Number of bins") + 
   facet_grid(~sample) + 
   xlab("") + 
-  theme(axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank()) +
+  #theme(axis.title.y=element_blank(),
+  #      axis.text.y=element_blank(),
+  #      axis.ticks.y=element_blank()) +
   coord_flip() + 
-  ggtitle("Predicted genus (shotgun)")
-
+  ggtitle("Predicted phylum by diamond") 
+diamond_phyla
+ggsave(filename = 'results/current/plots/diamond_phyla.png', device = 'png')
 ```
 ## Shotgun assembly statistics 
-[TODO] Size distrbution [bp] of the bins per assembly tool, number of reads [#] per bin (e.g. boxplots)
-[TODO] Relative amount of lost reads
-[TODO] Replot old and new side-by-side 
-
-Old data 
+Distribution of length of bins.  
 ```{r}
+# old
 contigs_dt <- fread('results/current/vamb/shotgun_fahad/bins/contig_lengths.csv')
 bins <- fread('results/current/vamb/shotgun_fahad/bins/clusters.tsv')
 colnames(bins) <- c("bin", "contignames")
 colnames(contigs_dt) <- c("index", "contignames", "lengths")
-
-ggplot(data=contigs_dt[lengths>50000], aes(lengths)) + geom_histogram() + scale_x_log10(labels=comma) + scale_y_log10()
-
 contig_bin_dt <- merge.data.table(contigs_dt, bins, by = "contignames" )
-contig_bin_dt
-contig_bin_dt$sample <- 'shotgun_fahad'
-contig_bin_dt[,.N, by=bin] %>% .[N != 1]
-bin_lengths <- contig_bin_dt[,.(bin_lengths = sum(lengths), sample), by=.(bin)]
-ggplot(data = bin_lengths, aes(bin_lengths)) + geom_histogram() + scale_x_log10(labels=comma) + scale_y_log10()
-#ggplot(data = bin_lengths, aes(sample = bin_lengths)) + geom_qq(distribution =  stats::qunif)  + scale_y_log10() + geom_abline(slope=1, intercept=0) + facet_wrap(~sample)
-ggplot(data = bin_lengths, aes(x=sample, y=bin_lengths)) + geom_violin() + scale_y_log10(labels=comma)
-```
-New data 
-```{r}
+contig_bin_dt$sample <- "Guppy v4.0.14"
+bin_lengths_old <- contig_bin_dt[,.(bin_lengths = sum(lengths), sample), by=.(bin)]
+
+#new
 contigs_dt <- fread('results/current/vamb/shotgun_new/bins/contig_lengths.csv')
 bins <- fread('results/current/vamb/shotgun_new/bins/clusters.tsv')
 colnames(bins) <- c("bin", "contignames")
 colnames(contigs_dt) <- c("index", "contignames", "lengths")
-
-ggplot(data=contigs_dt[lengths>50000], aes(lengths)) + 
-  geom_histogram() + 
-  scale_x_log10(labels=comma) + 
-  scale_y_log10() +
-  xlab("bp") +
-  ylab("bins")
-
 contig_bin_dt <- merge.data.table(contigs_dt, bins, by = "contignames" )
-contig_bin_dt
-contig_bin_dt$sample <- 'shotgun_new'
-contig_bin_dt[,.N, by=bin] %>% .[N != 1]
-bin_lengths <- contig_bin_dt[,.(bin_lengths = sum(lengths), sample), by=.(bin)]
+contig_bin_dt$sample <- "Guppy v6.3.7"
+bin_lengths_new <- contig_bin_dt[,.(bin_lengths = sum(lengths), sample), by=.(bin)]
 
-ggplot(data = bin_lengths, aes(bin_lengths)) + 
-  geom_histogram() + 
-  scale_x_log10(labels=comma) + 
-  scale_y_log10() + 
-  xlab("bp")
+#combined
+bin_lengths <- rbind(bin_lengths_new, bin_lengths_old)
 
-#ggplot(data = bin_lengths, aes(sample = bin_lengths)) + geom_qq(distribution =  stats::qunif)  + scale_y_log10() + geom_abline(slope=1, intercept=0) + facet_wrap(~sample)
-
-ggplot(data = bin_lengths, aes(x=sample, y=bin_lengths)) + 
-  geom_violin() + 
-  scale_y_log10(labels=comma) + 
-  xlab("bp")
+boxplot_bins <- ggplot(data = bin_lengths, aes(x=sample, y=bin_lengths)) + 
+  geom_boxplot() + 
+  scale_y_log10(labels=comma) 
+ggsave(filename = 'results/current/plots/bins_boxplot.png', device = 'png')
 ```
-# 16S EMU
+# Amplicon data 
+Amplicon data was analyzed with Emu pipeline which promises species resolution from 
 Tidy a data table.
 ```{r}
 # concatenate all 16S runs into one table 
@@ -227,22 +251,38 @@ amplicon_dt$sample <- str_replace(amplicon_dt$sample, 'new', "Guppy v6.3.7")
 amplicon_dt$sample <- str_replace(amplicon_dt$sample, 'porechop', "Guppy v4.0.14")
 # relative abundance in percent
 amplicon_dt[, abundance := abundance*100]
+head(amplicon_dt)
 ```
-Not possible to show all genera because too many, but we can separate the visualization into several parts. 
-## Most abundant genera
+Look at the identified phyla 
 ```{r}
-ggplot(data = amplicon_dt[abundance > 1, ], aes(x=reorder(genus, desc(abundance)), y=abundance, fill=sample)) + 
+emu_phyla <- ggplot(data = amplicon_dt[!is.na(abundance) & phylum != '', ], aes(x=reorder(phylum, desc(abundance)), y=abundance, fill=sample)) + 
   geom_bar(stat="sum", position="dodge") + 
   xlab("") + 
   ylab("abundance %") +
   coord_flip() + 
-  ggtitle("Most abundand genera > 1% (16S)") + 
+  ggtitle("Predicted phyla by Emu") + 
   facet_wrap(~barcode) +
   guides(size = FALSE) # remove n=1
+emu_phyla
+ggsave(filename = 'results/current/plots/emu_phyla.png', device = 'png')
+```
+Not possible to show all genera because too many, but we can separate the visualization into several parts.
+## Most abundant genera
+```{r}
+most_abundand <- ggplot(data = amplicon_dt[(abundance >= 1) & genus != '', ], aes(x=reorder(genus, desc(abundance)), y=abundance, fill=sample)) + 
+  geom_bar(stat="sum", position="dodge") + 
+  xlab("") + 
+  ylab("abundance %") +
+  coord_flip() + 
+  ggtitle("Most abundand genera (relative abundance >= 1%)") + 
+  facet_wrap(~barcode) +
+  guides(size = FALSE) # remove n=1
+most_abundand
+ggsave('results/current/plots/most_abundand_16s.png', device='png')
 ```
 ## Pathogenic genera
 ```{r}
-ggplot(data = amplicon_dt[genus %in% PATHOGENIC_GENERA,], 
+amplicon_pathogens <- ggplot(data = amplicon_dt[genus %in% PATHOGENIC_GENERA & abundance >= 0.01,], 
        aes(x=reorder(genus, desc(abundance)), 
            y=abundance, 
            fill=sample)) + 
@@ -251,14 +291,18 @@ ggplot(data = amplicon_dt[genus %in% PATHOGENIC_GENERA,],
   ylab("abundance %") +
   coord_flip() +
   scale_y_continuous(guide = guide_axis(angle = 45)) +
-  ggtitle("Potentially pathogenic genera (16S)") + 
+  #ggtitle("Potentially pathogenic genera (relative abundance >= 0.01%)") + 
   facet_wrap(~barcode) + 
-  guides(size = FALSE)
+  guides(size = FALSE) +
+  theme(text=element_text(size=14))
+  
+amplicon_pathogens
+ggsave(file = 'results/current/plots/pathogenic_genera.png', device = 'png')
 ```
 
 ## Leptospira 
 ```{r}
-ggplot(data = amplicon_dt[genus == "Leptospira", ],  
+leptospira <- ggplot(data = amplicon_dt[genus == "Leptospira", ],  
        aes(x=reorder(species, desc(abundance)), 
            y=abundance, 
            fill=sample)) + 
@@ -267,13 +311,16 @@ ggplot(data = amplicon_dt[genus == "Leptospira", ],
   ylab("abundance %") +
   coord_flip() +
   scale_y_continuous(guide = guide_axis(angle = 45)) +
-  ggtitle("Leptospira spp. (16S)") + 
+ # ggtitle("Leptospira spp. (16S)") + 
   facet_wrap(~barcode) + 
+  theme(text=element_text(size=14)) +
   guides(size = FALSE)
+leptospira
+ggsave('results/current/plots/leptospira_16S.png', device='png')
 ```
-## Leptospira 
+## Arcobacter
 ```{r}
-ggplot(data = amplicon_dt[genus == "Arcobacter", ],  
+arcobacter <- ggplot(data = amplicon_dt[genus == "Arcobacter", ],  
        aes(x=reorder(species, desc(abundance)), 
            y=abundance, 
            fill=sample)) + 
@@ -285,27 +332,26 @@ ggplot(data = amplicon_dt[genus == "Arcobacter", ],
   ggtitle("Arcobacter spp. (16S)") + 
   facet_wrap(~barcode) + 
   guides(size = FALSE)
+arcobacter
+ggsave('results/current/plots/arcobacter_16S.png', device='png')
 ```
 ## Overlaps 
 ```{r}
-set1 <- c(unique(diamond_dt[genus != "", genus]), unique(sourmash_dt[genus != "", genus]))
-set2 <- unique(amplicon_dt[genus != "", genus])
+set1 <- c(unique(diamond_dt[phylum != "", phylum]), unique(sourmash_dt[phylum != "", phylum]))
+set2 <- unique(amplicon_dt[phylum != "", phylum])
 
-lst <- list(WGS_sourmash_diamond=set1,
+lst <- list(shotgun_sourmash_diamond=set1,
             amplicon_emu=set2)
 
-# load ggVennDiagram Package
-library("ggVennDiagram")
-  
-# use list as an input
-  
-# creating Venn diagram and displaying 
-# all sets
 ggVennDiagram(lst) 
+set1
+set2
 ```
 
-## 16S vs WGS 
-Load the coverm abundance estimations of WGS 
+# DAS_Tool assemblies
+For final comparsion only use high quality assemblies from DAS_Tool. 
+
+Load shotgun assembly-based abundances computed from DAS_Tool assemblies with CoverM. 
 ```{r}
 # concatenate fahad and new data to one df 
 files <- list.files(path = 'results/current/coverm/',
@@ -325,10 +371,12 @@ coverm_dt$filepath <- str_replace(coverm_dt$filepath, 'shotgun_fahad_summary.txt
 setnames(coverm_dt, c("sample", "genome", "abundance"))
 coverm_dt
 ```
-Load the GTDB taxonomy 
+Load predicted GTDB taxonomy. 
 ```{r}
 # concatenate fahad and new data to one df 
-files <- c('results/current/gtdbtk/shotgun_new/shotgun_new.bac120.summary.tsv', 'results/current/gtdbtk/shotgun_fahad/shotgun_fahad.bac120.summary.tsv') 
+files <- c('results/current/gtdbtk/shotgun_new/shotgun_new.bac120.summary.tsv', 
+           'results/current/gtdbtk/shotgun_fahad/shotgun_fahad.bac120.summary.tsv') 
+
 # name the list elements by the filenames 
 names(files) <- basename(files)
 # read all files at once into a list of data.tables
@@ -352,41 +400,107 @@ taxonomy_dt$order <- str_replace(taxonomy_dt$order, "o__", "")
 taxonomy_dt$family <- str_replace(taxonomy_dt$family, "f__", "")
 taxonomy_dt$genus <- str_replace(taxonomy_dt$genus, "g__", "")
 taxonomy_dt$species <- str_replace(taxonomy_dt$species, "s__", "")
+
 taxonomy_dt[taxonomy_dt == ""] <- NA
+taxonomy_dt
 ```
 
-Compose clean shotgun data
+Select which Guppy data should be plotted.
+
+```{r}
+#GUPPY <- "Guppy v6.3.7" #Guppy v6.3.7 Guppy v4.0.14
+#GUPPY_FILENAME <- "new_guppy" #new_guppy old_guppy
+GUPPY <- "Guppy v4.0.14" #Guppy v6.3.7 Guppy v4.0.14
+GUPPY_FILENAME <- "old_guppy" #new_guppy old_guppy
+```
+Tidy shotgun assembly-based data table (for one GUPPY version). Because we rescale abundances by skipping the unclassified and grouping all the low abundand together, we can only work with one set of data (old or new guppy). 
 
 ```{r}
 shotgun_dt <- merge.data.table(taxonomy_dt, coverm_dt, by = c("sample", "genome"))
-shotgun_dt[order(abundance, decreasing=T),]
+# extract abundances 
+shotgun_new_phylum_abun_dt <- shotgun_dt[sample == GUPPY, c("superkingdom", "phylum", "abundance")] %>% .[,.(sum(abundance),
+                                                                                                    sample = "shotgun_assembly"), by=c("phylum", "superkingdom")] %>% select(superkingdom, phylum, sample, V1) %>% setnames(., c("superkingdom", "phylum", "sample", "abundance"))
+# add unclassified from coverM
+shotgun_new_phylum_abun_dt <- rbindlist(list(shotgun_new_phylum_abun_dt, data.table(phylum ="unclassified", 
+                                                                                    superkingdom ="unclassified",
+                                                                                    sample = "shotgun_assembly", 
+                                                                                    abundance = coverm_dt[sample == GUPPY & genome == 'unmapped', abundance])))
+# convert to wide format
+shotgun_new_phylum_abun_dt <- dcast(shotgun_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
+print("Sum of abundances")
+shotgun_new_phylum_abun_dt[, sum(shotgun_assembly)]
+shotgun_new_phylum_abun_dt
 ```
-BugSeq taxonomy profiling from read-based shotgun data. 
+Fix the old NCBI taxonomy
 ```{r}
-bugseq_dt <- fread('results/current/bugseq/metagenomic_classification/read-based/shotgun_new.filtered-reads.kreport')
-colnames(bugseq_dt) <- c('abundance', 'read_count_taxon_and_below', 'read_count_taxon', 'rank', 'ncbi_id', 'name')
+#replace old NCBI taxonomy 
+# [TODO] automatically 
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Actinobacteriota', 'Actinobacteria')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Bacteroidota', 'Bacteroidetes')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Chloroflexota', 'Chloroflexi')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Dependentiae', 'Candidatus Dependentiae')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Nitrospirota', 'Nitrospirae')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Patescibacteria', 'Candidatus Gracilibacteria')
+shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Verrucomicrobiota', 'Verrucomicrobia')
+```
 
-bugseq_dt[(rank == 'P') | (name == 'unclassified'), sum(abundance)] # 99.41% total abundance because some of the low abundant taxa were rounded to 0
-#recalculate abundance from read counts 
+Tidy BugSeq taxonomy profiling from read-based shotgun data and normalize the abundances (one GUPPY version).
+```{r}
+files <- c('results/current/bugseq/shotgun_fahad/metagenomic_classification/read-based/shotgun_fahad.filtered-reads.kreport',
+           'results/current/bugseq/shotgun_new/metagenomic_classification/read-based/shotgun_new.filtered-reads.kreport') 
+# name the list elements by the filenames 
+names(files) <- basename(files)
+# read all files at once into a list of data.tables
+tables <- lapply(files, fread)
+# bind all tables into one using rbindlist, 
+# keeping the list names (the filenames) as an id column. 
+bugseq_dt <- rbindlist(tables, idcol = 'filepath')
+
+bugseq_dt$filepath <- str_replace(bugseq_dt$filepath, "shotgun_new.filtered-reads.kreport", "Guppy v6.3.7")
+bugseq_dt$filepath <- str_replace(bugseq_dt$filepath, "shotgun_fahad.filtered-reads.kreport", "Guppy v4.0.14")
+colnames(bugseq_dt) <- c('sample', 'abundance', 'read_count_taxon_and_below', 'read_count_taxon', 'rank', 'ncbi_id', 'name')
+
+# SELECT SAMPLE #
+bugseq_dt_full <- copy(bugseq_dt)
+bugseq_dt <- bugseq_dt[sample == GUPPY, ]
+
+print('Summed up phyla relative abubdances')
+bugseq_dt[(rank == 'P') | (name == 'unclassified'), sum(abundance)] # 99.41% total abundance because some of the low abundant taxa were not classifed to phyla level  
 
 N_reads <- bugseq_dt[(name == 'unclassified') | (name == 'root'), sum(read_count_taxon_and_below)]
+#everything not classified o phylum level is unclassifed, too
+bugseq_phylum_abun_dt <- bugseq_dt[(rank %in% c('P', 'U') ), .(phylum = name, shotgun_read = read_count_taxon_and_below*100/N_reads)]
+bugseq_phylum_abun_dt[phylum == 'unclassified']$shotgun_read <- 100 - bugseq_phylum_abun_dt[phylum != 'unclassified', sum(shotgun_read)]
 
-bugseq_phylum_abun_dt <- bugseq_dt[(rank == 'P') | (name == 'unclassified'), .(phylum = name, 
-                                                      shotgun_read = read_count_taxon_and_below*100/N_reads)]
+print('After normalization')
+bugseq_phylum_abun_dt[, sum(shotgun_read)]
+
 # add superkingdom annotation
 kingdom_phylum <- bugseq_dt[rank %in% c('D','P'), name]
-indices <- which(kingdom_phylum %in% c('Bacteria', "Eukaryota", "Archaea", "Viruses"))
-kingdom_lst <- list(Bacteria = kingdom_phylum[(indices[1]+1): (indices[2]-1)],
-                    Eykaryota = kingdom_phylum[(indices[2]+1):(indices[3]-1)],
-                    Archaea = kingdom_phylum[(indices[3]+1):(indices[4]-1)],
-                    Viruses = kingdom_phylum[(indices[4]+1):length(kingdom_phylum)])
-
-
+if (GUPPY_FILENAME == 'new_guppy') {
+  indices <- which(kingdom_phylum %in% c('Bacteria', "Eukaryota", "Archaea", "Viruses"))
+  kingdom_lst <- list(Bacteria = kingdom_phylum[(indices[1]+1): (indices[2]-1)],
+                      Eukaryota = kingdom_phylum[(indices[2]+1):(indices[3]-1)],
+                      Archaea = kingdom_phylum[(indices[3]+1):(indices[4]-1)],
+                      Viruses = kingdom_phylum[(indices[4]+1):length(kingdom_phylum)])
+} else {
+    indices <- which(kingdom_phylum %in% c('Bacteria', "Archaea", "Eukaryota", "Viruses"))
+    kingdom_lst <- list(Bacteria = kingdom_phylum[(indices[1]+1): (indices[2]-1)],
+                      Archaea = kingdom_phylum[(indices[2]+1):(indices[3]-1)],
+                      Eukaryota = kingdom_phylum[(indices[3]+1):(indices[4]-1)],
+                      Viruses = kingdom_phylum[(indices[4]+1):length(kingdom_phylum)])
+}
 bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Bacteria, superkingdom := 'Bacteria']
-bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Eykaryota, superkingdom := 'Eykaryota']
+bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Eukaryota, superkingdom := 'Eukaryota']
 bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Archaea, superkingdom := 'Archaea']
 bugseq_phylum_abun_dt[phylum %in% kingdom_lst$Viruses, superkingdom := 'Viruses']
 
+bugseq_phylum_abun_dt[phylum == 'unclassified', superkingdom := 'unclassified']
+
+bugseq_phylum_abun_dt
+```
+Correct NCBI taxonomy
+```{r}
 #convert to old NCBI taxonomy 
 # check Planctomyce -> should be the same 
 bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Bacteroidota', 'Bacteroidetes')
@@ -399,39 +513,13 @@ bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Actin
 bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Bacillota', 'Firmicutes')
 bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, "Tenericutes", "Mycoplasmatota")
 bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, "Pseudomonadota", "Proteobacteria")
-bugseq_phylum_abun_dt[phylum == 'unclassified', superkingdom := 'unclassified']
-
-bugseq_phylum_abun_dt
+bugseq_phylum_abun_dt$phylum <- str_replace(bugseq_phylum_abun_dt$phylum, 'Planctomycetota', 'Planctomycetes')
 ```
 
-Shotgun taxonomy profiling.
-
-```{r}
-# extract abundances 
-shotgun_new_phylum_abun_dt <- shotgun_dt[sample == "Guppy v6.3.7", c("superkingdom", "phylum", "abundance")] %>% .[,.(sum(abundance),
-                                                                                                    sample = "shotgun_assembly"), by=c("phylum", "superkingdom")] %>% select(superkingdom, phylum, sample, V1) %>% setnames(., c("superkingdom", "phylum", "sample", "abundance"))
-# add unclassified from coverm
-shotgun_new_phylum_abun_dt <- rbindlist(list(shotgun_new_phylum_abun_dt, data.table(phylum ="unclassified", 
-                                                                                    superkingdom ="unclassified",
-                                                                                    sample = "shotgun_assembly", 
-                                                                                    abundance = coverm_dt[sample == 'Guppy v6.3.7' & genome == 'unmapped', abundance])))
-# convert to wide format
-shotgun_new_phylum_abun_dt <- dcast(shotgun_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
-#replace old NCBI taxonomy 
-# [TODO] automatically 
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Actinobacteriota', 'Actinobacteria')
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Bacteroidota', 'Bacteroidetes')
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Chloroflexota', 'Chloroflexi')
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Dependentiae', 'Candidatus Dependentiae')
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Nitrospirota', 'Nitrospirae')
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Patescibacteria', 'Candidatus Gracilibacteria')
-shotgun_new_phylum_abun_dt$phylum <- str_replace(shotgun_new_phylum_abun_dt$phylum, 'Verrucomicrobiota', 'Verrucomicrobia')
-shotgun_new_phylum_abun_dt
-```
 Amplicon taxonomy profiling 
 ```{r}
 # extract abundances 
-amplicon_new_phylum_abun_dt <- amplicon_dt[sample == "Guppy v6.3.7", c("superkingdom", "phylum", "abundance", "barcode")] %>% .[,sum(abundance), by=c("superkingdom", "phylum", "barcode")] %>% setnames(., c("superkingdom", "phylum", "sample", "abundance"))
+amplicon_new_phylum_abun_dt <- amplicon_dt[sample == GUPPY, c("superkingdom", "phylum", "abundance", "barcode")] %>% .[,sum(abundance), by=c("superkingdom", "phylum", "barcode")] %>% setnames(., c("superkingdom", "phylum", "sample", "abundance"))
 
 # add unclassified 
 amplicon_new_phylum_abun_dt <- replace(amplicon_new_phylum_abun_dt, amplicon_new_phylum_abun_dt=='', "unclassified")
@@ -440,6 +528,10 @@ amplicon_new_phylum_abun_dt <- replace(amplicon_new_phylum_abun_dt, amplicon_new
 amplicon_new_phylum_abun_dt <- dcast(amplicon_new_phylum_abun_dt, ... ~ sample, value.var = "abundance")
 amplicon_new_phylum_abun_dt <- amplicon_new_phylum_abun_dt[!((BC02 == 0) & (BC03 == 0) & (BC04 ==0)),]
 amplicon_new_phylum_abun_dt[phylum == 'unclassified', superkingdom := 'unclassified']
+
+print("Sum of relative abundances")
+amplicon_new_phylum_abun_dt[, .(sum(BC02, na.rm=T), sum(BC03, na.rm=T), sum(BC04, na.rm=T))]
+
 amplicon_new_phylum_abun_dt
 ```
 Merged taxonomy profile from amplicon, shotgun_read and shotgun_assembly 
@@ -457,6 +549,25 @@ comparison_dt <- merge.data.table(comparison_dt,
                  all=TRUE,
                  by=c("superkingdom", "phylum"),
                  allow.cartesian=TRUE)
+
+other_abun <- comparison_dt[(((BC02 < 0.01) | (is.na(BC02))) & 
+                               ((BC03 < 0.01) | (is.na(BC03))) & 
+                               ((BC04 < 0.01) | (is.na(BC04))) & 
+                               ((shotgun_read < 0.01) | (is.na(shotgun_read))) & 
+                               ((shotgun_assembly < 0.01) | (is.na(shotgun_assembly)))),] %>% .[,.(BC03 = sum(BC03, na.rm = T),
+                                                                                                   BC04 = sum(BC04,  na.rm = T), 
+                                                                                                   BC02 = sum(BC02,  na.rm = T), 
+                                                                                                   shotgun_read = sum(shotgun_read,  na.rm = T), 
+                                                                                                   shotgun_assembly = sum(shotgun_assembly,  na.rm = T), phylum = 'other', superkingdom = 'other'
+                                                                                                   )]
+
+comparison_dt <- comparison_dt[!(((BC02 < 0.01) | (is.na(BC02))) & 
+                               ((BC03 < 0.01) | (is.na(BC03))) & 
+                               ((BC04 < 0.01) | (is.na(BC04))) & 
+                               ((shotgun_read < 0.01) | (is.na(shotgun_read))) & 
+                               ((shotgun_assembly < 0.01) | (is.na(shotgun_assembly)))),]  %>% add_row(phylum = 'other', superkingdom = 'other', BC02 = other_abun[, BC02], BC03 = other_abun[, BC03], BC04 = other_abun[, BC04], shotgun_read = other_abun[, shotgun_read], shotgun_assembly = other_abun[, shotgun_assembly])
+
+# convert all NA to 0 for plotting purposes. From here be very careful when calculating something! 
 comparison_dt[is.na(comparison_dt)] <- 0
 
 comparison_dt
@@ -469,7 +580,7 @@ mat <- as.matrix(comparison_dt[, c( "shotgun_assembly",
 
 rownames(mat) <- comparison_dt$phylum
 colnames(mat) <- c( "shotgun_assembly", "shotgun_read", "amplicon.BC02", "amplicon.BC03", "amplicon.BC04")
-head(mat)
+comparison_dt[,.(sum(shotgun_assembly), sum(shotgun_read), sum(BC02), sum(BC03), sum(BC04))]
 
 ```
 Create row annotation 
@@ -502,6 +613,7 @@ breaks <- c(seq(min(mat), 0.00000001, length.out=ceiling(paletteLength/2) + 1),
 pheatmap(mat, 
          color = color,
          breaks = breaks,
+         main = GUPPY,
          cluster_rows=TRUE, 
          cluster_cols=TRUE,
          fontsize_row = 8,
@@ -510,15 +622,16 @@ pheatmap(mat,
          annotation_row = row.ann,
          annotation_colors = list(superkingdom = c(Archaea=annotation_colors[1],
                                                   Bacteria=annotation_colors[2],
-                                                  Eykaryota=annotation_colors[3],
+                                                  Eukaryota=annotation_colors[3],
                                                   Viruses=annotation_colors[4],
+                                                  other='white',
                                                   unclassified='white')),
          cellheight = 8,
-         filename = 'all_abund_mat.png'
+         filename = paste(GUPPY_FILENAME, 'all_abund_mat.png', sep="_")
          )
 ```
 
-Only classified
+Only classified and abundance > 0.01%
 ```{r}
 rescale_abundance <- function(abundance) {100*abundance/sum(abundance)}
 
@@ -542,39 +655,319 @@ row.ann <- data.frame(superkingdom = comparison_low_abun_dt[, superkingdom])
 rownames(row.ann) <- comparison_low_abun_dt$phylum 
 
 pheatmap(low_abun_mat, 
-         color = color,
-         breaks = breaks, 
-         cluster_rows=TRUE, 
-         cluster_cols=TRUE,
-         fontsize_row = 8,
-         angle_col = 45,
-         display_numbers = TRUE,
-         annotation_row = row.ann,
-         annotation_colors = list(superkingdom = c(Archaea=annotation_colors[1],
-                                                   Bacteria=annotation_colors[2],
-                                                   Eykaryota=annotation_colors[3],
-                                                   Viruses=annotation_colors[4])),
-         cellheight = 8,
-         filename = 'low_abund_mat.png') 
+           color = color,
+           main = GUPPY,
+           breaks = breaks, 
+           cluster_rows=TRUE, 
+           cluster_cols=TRUE,
+           fontsize_row = 8,
+           angle_col = 45,
+           display_numbers = TRUE,
+           annotation_row = row.ann,
+           annotation_colors = list(superkingdom = c(Archaea=annotation_colors[1],
+                                                     Bacteria=annotation_colors[2],
+                                                     Eukaryota=annotation_colors[3],
+                                                     Viruses=annotation_colors[4],
+                                                     other='white')),
+           cellheight = 8,
+           filename = paste(GUPPY_FILENAME, 'low_abund_mat.png', sep = '_')
+           )
 
 ```
-## In-detail comparison investigation 
-Two assembled phyla lacking in 16S and shotgun read mapping approaches. 
-```{r}
-target_phyla <- shotgun_dt[phylum %like% 'Dependentiae',] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum)]
 
-checkm_dt[, bin_id := as.numeric(bin_id)]
+
+## In-detail investigation of DAS_Tool nomralized assemblies processed with MAGpy 
+Comment on implementation: DASTool construct new refined bins by combining contigs from bins from several tools. Therefore, the final DASTool bins do not follow the IDs of the corresponding tool and are more or less arbitrary. Saying that, it is obivios, that althou we already ran the downstream analysis on the output of each of binners, we nned to repeat it for the DASTool bins. 
+
+So I renamed the final bins of DASTool by adding the 'das_tool' prefix, copied them to mags folder of MAGpy and ran the pipeline again. 
+Check for all of the results. 
+
+Read MAGpy results for DAStool
+
+```{r}
+#TODO : falsely imported fahad sample -> rename 
+checkm_dastool_dt <- fread("MAGpy_das_tool/checkm_plus.txt")
+# bin_id contains the sample identifier and bin number, which we need in a separate column 
+checkm_dastool_dt <- checkm_dastool_dt %>% separate(col = "bin_id", into = c("shotgun", "sampletmp", "das", "tool", "binning_tool", "bin_id", "contigs")) %>% unite(col=sample, 
+                                                                                                             shotgun, 
+                                                                                                             sampletmp, sep = "_") %>% unite(col=tool,
+                                                                                                                                             das, tool, sep = "_") 
+checkm_dastool_dt$sample <- str_replace(checkm_dastool_dt$sample, 'shotgun_new', "Guppy v6.3.7")
+checkm_dastool_dt$sample <- str_replace(checkm_dastool_dt$sample, 'shotgun_fahad', "Guppy v4.0.14")
+checkm_dastool_dt
+```
+
+Two assembled phyla lacking in 16S and shotgun read mapping approaches: taxonomy mismatches. 
+
+Candidatus Dependetiae (parasite of protists). 
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v4.0.14') & (phylum %like% 'Dependentiae'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum)]
+target_phyla
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_fahad/shotgun_fahad_metabat.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, superkingdom = superkingdom.x, phylum = phylum.x, size, N50, n_genomes, n_markers, n_marker_sets, completeness, contamination, binScore, uniqueBacSCGs, uniqueArcSCGs   )]
+#print(xtable(target_phyla_info), include.rownames = TRUE, include.colnames = TRUE, sanitize.text.function = I)
+target_phyla_info
+bugseq_dt_full[(name %like% 'Dependen'),]
+```
+Patescibacteria
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Patescibacteria'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
 
 das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_metabat.eval")
 das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
 das_tools_eval[, bin_id := as.numeric(bin_id)]
            
-target_phyla_info <- merge.data.table(target_phyla, checkm_dt, 
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
                  by.x = c('sample', 'binning_tool', 'bin_id'),
                  by.y = c('sample', 'binning_tool', 'bin_id'))
+
 target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
                  by.x = c('binning_tool', 'bin_id'),
-                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, superkingdom = superkingdom.x, phylum = phylum.x, size, contigs, N50, n_genomes, n_markers, n_marker_sets, completeness, contamination, binScore, uniqueBacSCGs, uniqueArcSCGs   )]
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, superkingdom = superkingdom.x, phylum = phylum.x, size, N50, n_genomes, n_markers, n_marker_sets, completeness, contamination, binScore, uniqueBacSCGs, uniqueArcSCGs   )]
 #print(xtable(target_phyla_info), include.rownames = TRUE, include.colnames = TRUE, sanitize.text.function = I)
 target_phyla_info
+shotgun_dt[genome %in% c('metabat.112.contigs',
+                        'metabat.075.contigs', 
+                        'metabat.029.contigs'), ]
+bugseq_dt_full[(name %like% 'Patescibacteria') | (name %like% 'Gracili'),]
+```
+
+Actinobacteria
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Actinobacter'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_vamb.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+```
+Proteobacteria
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Proteobacter'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_vamb.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+```
+Myxococcota 
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Myxococcota'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_metabat.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+bugseq_dt_full[(name %like% 'Myxoc' & rank == 'P'),]
+```
+Nitrospirae 
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Nitrospir'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_vamb.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+```
+Verrucomicrobia
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Verrucomicro'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_vamb.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+```
+Bacteroidetes
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Bacteroid'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_metabat.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+```
+Chloroflexi
+```{r}
+target_phyla <- shotgun_dt[(sample == 'Guppy v6.3.7') & (phylum %like% 'Chlorofle'),] %>% separate(., genome, into = c('binning_tool', 'bin_id','contigs')) %>% .[, .(sample, binning_tool, bin_id = as.numeric(bin_id), superkingdom, phylum, class, order, family, genus, species)]
+target_phyla
+
+checkm_dastool_dt[, bin_id := as.numeric(bin_id)]
+
+das_tools_eval <- fread("results/current/das_tool/shotgun_new/shotgun_new_maxbin.eval")
+das_tools_eval <- das_tools_eval %>% separate(., bin, into = c('binning_tool', 'bin_id')) 
+das_tools_eval[, bin_id := as.numeric(bin_id)]
+           
+target_phyla_info <- merge.data.table(target_phyla, checkm_dastool_dt, 
+                 by.x = c('sample', 'binning_tool', 'bin_id'),
+                 by.y = c('sample', 'binning_tool', 'bin_id'))
+
+target_phyla_info <- merge.data.table(target_phyla_info, das_tools_eval, 
+                 by.x = c('binning_tool', 'bin_id'),
+                 by.y = c('binning_tool', 'bin_id')) %>% .[,.(binning_tool, bin_id, sample, 
+                                                              superkingdom = superkingdom.x, 
+                                                              phylum = phylum.x,
+                                                              class = class.x,
+                                                              order = order.x, 
+                                                              family = family.x, 
+                                                              genus = genus.x,
+                                                              size, N50, completeness, contamination, binScore)]
+target_phyla_info[,.(superkingdom, phylum, class, order, family, genus)]
+target_phyla_info
+```
+C. Melainabacteria found only with 16S
+```{r}
+bugseq_dt_full[(name %like% 'Melain'),]
+```
+
+Mycobacteria: saprophytic or pathogenic? 
+```{r}
+amplicon_dt[phylum == 'Actinobacteria' & genus %like% 'My',]
+bugseq_dt_full[sample == 'Guppy v6.3.7' & (name %like% 'Mycobac'),]
+diamond_dt[sample == 'Guppy v6.3.7' & (genus %like% 'Mycobac'),]
+sourmash_dt[sample == 'Guppy v6.3.7' & (genus %like% 'Mycobac'),]
+```
+Where is Leptospira? 
+```{r}
+amplicon_dt[phylum == 'Spirochaetes' & genus == 'Leptospira',]
+bugseq_dt_full[(name %like% 'Leptospira') & abundance > 0,]
+
+diamond_dt[genus %like% 'Lepto',]
+sourmash_dt[genus %like% 'Lepto',]
+```
+Arcobacter 
+
+```{r}
+amplicon_dt[genus == 'Arcobacter',]
+bugseq_dt_full[(name %like% 'Arco') & (rank == 'S'),sum(abundance),by=c('rank', 'name')]
+diamond_dt[genus %like% 'Arco',]
+sourmash_dt[genus %like% 'Arco',]
 ```
