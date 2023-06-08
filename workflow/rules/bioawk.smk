@@ -1,12 +1,12 @@
 rule bioawk:
-  conda: "../envs/bioawk.yaml"
+  conda: "bioawk"
 	input:
-		fa = "results/current/medaka/{sample}.medaka{m_num}/assembly.fasta"
+		fa = "resources/{sample}.fasta"
 	output:
-		fa = "results/current/bioawk/{sample}.medaka{m_num}_filtered/assembly.fasta"
+		fa = "results/current/bioawk/{sample}/assembly.fasta"
 	params:
 		min_contig_length = config["bioawk"]["min_contig_length"]
-	log: "logs/bioawk/{sample}.medaka{m_num}_filtered.txt"
+	log: "logs/bioawk/{sample}_filtered.txt"
 	shell:
 		"""
 		bioawk -cfastx 'BEGIN{{ shorter = 0}} {{if (length($seq) < {params.min_contig_length}) shorter += 1}} END {{print "contigs shorter than {params.min_contig_length} kb BEFORE filtering:", shorter}}' {input.fa} >{log} 2>&1

@@ -1,19 +1,12 @@
-import glob 
-
-def get_fa_bins(wildcards):
-        dir = "results/current/das_tool/{sample}/{sample}_DASTool_bins/".format(sample = wildcards.sample)
-        fas = glob.glob(dir + "*.fa")
-        return fas
-
 rule coverm:
-	conda: "../envs/coverm.yaml"
+	conda: "coverm"
 	threads: config["coverm"]["threads"]
 	input:
-		reads = "results/current/downsampled/{sample}.filtered.fastq.gz",
-		bins = dynamic(get_fa_bins)
+		reads = "resources/{sample}.fastq",
+		bins = dynamic(expand("results/current/das_tool/{{sample}}/{{sample}}_DASTool_bins/{{binner}}.contigs.fa"))
 	output:
 		"results/current/coverm/{sample}_summary.txt"
-	log: "logs/coverm/{sample}.txt"
+	#log: "logs/coverm/{sample}.txt"
 	shell:
 		"""
 		coverm genome --single {input.reads} \

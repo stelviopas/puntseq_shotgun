@@ -1,0 +1,6 @@
+# cluster_config.yml - cluster configuration
+__default__:
+     partition: gpu_p
+     qos: gpu
+     time: 0-12:00:00 # time limit for each job in h:m:s
+     mem: 64G

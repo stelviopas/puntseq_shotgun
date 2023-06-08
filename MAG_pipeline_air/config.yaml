@@ -1,0 +1,20 @@
+minimap2:
+        memory: 100000
+        threads: 16
+bioawk:
+        threads: 1
+        min_contig_length: 1000       
+metabat2:
+        threads: 36
+        minClsSize: 50000
+maxbin2:
+        threads: 36 
+vamb_workflow:
+        index_size: "64G"
+das_tool:
+        threads: 36
+coverm:
+        threads: 36
+gtdbtk:
+        threads: 64
+        db: "/lustre/groups/haicu/workspace/anastasiia.grekova/gtdbtk-2.1.1/db"

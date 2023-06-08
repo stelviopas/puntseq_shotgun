@@ -39,5 +39,5 @@ def save_bins(path2vamb, maxbins, filter=False, lengths_to_csv=False):
 	print("Bins saved: ", len(filtered_bins))
 	vamb.vambtools.write_bins(os.path.join(path2vamb, 'filtered_bins'), filtered_bins, fastadict, maxbins=maxbins)
 
-path2vamb = '/home/haicu/anastasiia.grekova/workspace/puntseqWGS/results/current/vamb/shotgun_new/bins/'
+path2vamb = '/home/haicu/anastasiia.grekova/workspace/MAG_pipeline_air/results/current/vamb/bins'
 save_bins(path2vamb, maxbins = 50000, filter=True, lengths_to_csv=True)

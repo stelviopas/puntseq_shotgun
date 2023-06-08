@@ -1,5 +1,3 @@
-import glob 
-
 rule harmonize_metabat:
 	input:
 		"results/current/metabat2/{sample}/{sample}"
@@ -8,13 +6,8 @@ rule harmonize_metabat:
 	shell:
 		"cp {input} {output}"
 
-def get_fasta_bins(wildcards):
-	dir = "results/current/maxbin2/{sample}/{sample}".format(sample = wildcards.sample)
-	fastas = glob.glob(dir + "*.fasta")
-	return fastas
-
 rule harmonize_maxbin:
-	input: fastas=dynamic(get_fasta_bins)
+	input: fastas=dynamic(expand("results/current/maxbin2/{{sample}}.{{maxbin_n}}.fasta"))
 	output: "results/current/maxbin2/{sample}/{sample}.tsv"
 	run: 
 		import pandas as pd 
@@ -31,14 +24,8 @@ rule harmonize_maxbin:
 		df = pd.DataFrame({'contigs': contigs, 'bins': bins})
 		df.to_csv(output[0], sep='\t', header=False, index=False)					
 
-#########################################
-def get_fna_bins(wildcards):
-        dir = "results/current/vamb/{sample}/bins/filtered_bins/".format(sample = wildcards.sample)
-        fnas = glob.glob(dir + "*.fna")
-        return fnas
-
 rule harmonize_vamb:
-        input: fnas=dynamic(get_fna_bins) 
+        input: fnas=dynamic(expand("results/current/vamb/{{sample}}/bins/filtered_bins/{{vamb_n}}.fna")) 
         output: "results/current/vamb/{sample}/bins/filtered_bins/{sample}.tsv"
         run:
                 import pandas as pd
@@ -54,7 +41,7 @@ rule harmonize_vamb:
                                                 contigs.append(line.lstrip(">").rstrip('\n')) # drop > and /n
                 df = pd.DataFrame({'contigs': contigs, 'bins': bins})
                 df.to_csv(output[0], sep='\t', header=False, index=False)
-##########################################
+
 
 # harmonizing all vamb bins leads to too big output which can not be processed by DAS_tool
 
@@ -71,18 +58,20 @@ rule harmonize_all_vamb:
 '''
 				
 rule das_tool:
-	conda: "../envs/das_tool.yaml"
+	conda: "das_tool"
 	threads: config["das_tool"]["threads"]
 	input:
 		metabat = "results/current/metabat2/{sample}/{sample}.tsv",
 		maxbin = "results/current/maxbin2/{sample}/{sample}.tsv",
 		vamb = "results/current/vamb/{sample}/bins/filtered_bins/{sample}.tsv",
-		contigs = "results/current/medaka/{sample}.medaka1/assembly.fasta"
+		contigs = "results/current/bioawk/{sample}/assembly.fasta"
 	output:
-		"results/current/das_tool/{sample}/{sample}_DASTool_summary.txt"
+		#directory("results/current/das_tool/{sample}/{sample}_DASTool_bins/"),
+		#"results/current/das_tool/{sample}/{sample}_DASTool_summary.txt",
+		dynamic("results/current/das_tool/{sample}/{sample}_DASTool_bins/{binner}.contigs.fa")		
 	params:
 		base_name = "results/current/das_tool/{sample}/{sample}"	
-	log: "logs/das_tool/{sample}.txt"
+	#log: "logs/das_tool/{sample}_{binner}.txt"
 	shell:
 		"""
 		DAS_Tool -i {input.metabat},{input.maxbin},{input.vamb} -l metabat,maxbin,vamb -c {input.contigs} -o {params.base_name}  --write_bins 1 --resume 1 -t {threads} > {log} 

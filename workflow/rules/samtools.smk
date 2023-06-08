@@ -1,5 +1,5 @@
 rule samtools:
-  conda: "../envs/samtools.yaml"
+  conda: "samtools"
 	input:
 		"results/current/minimap2/leptospira_interrogans_shotgun_new.sam"
 	output:
